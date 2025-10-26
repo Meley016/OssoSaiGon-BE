@@ -1,0 +1,182 @@
+<!-- src/views/partials/promotion.ejs -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
+<link rel="stylesheet" href="/css/globe.css" />
+
+<div class="promotion-container">
+  <h2 style="margin-bottom: 1 уси;">Quản lý Khuyến mãi</h2>
+
+
+  <form id="promotion-form" class="form-section">
+    <div class="form-grid">
+      <input type="text" name="code" placeholder="Mã khuyến mãi" class="ant-input" required />
+      <input type="text" name="name" placeholder="Tên chương trình" class="ant-input" required />
+      <select name="type" class="ant-input" required>
+        <option value="">--Loại--</option>
+        <option value="percent">Giảm theo %</option>
+        <option value="fixed">Giảm cố định (VNĐ)</option>
+      </select>
+      <input type="number" name="value" placeholder="Giá trị" class="ant-input" min="0" required />
+      <input type="number" name="minOrder" placeholder="Đơn tối thiểu (VNĐ)" class="ant-input" min="0" />
+      <input type="date" name="startDate" class="ant-input" required />
+      <input type="date" name="endDate" class="ant-input" required />
+      <input type="number" name="usageLimit" placeholder="Giới hạn sử dụng" class="ant-input" min="1" />
+    </div>
+    <div class="button-row">
+      <button type="submit" class="btn-custom">Tạo khuyến mãi</button>
+      <button type="reset" class="btn-reset">Đặt lại</button>
+    </div>
+  </form>
+
+  <!-- Danh sách -->
+  <div class="promotion-grid" id="promotionGrid"></div>
+</div>
+
+<!-- Modal Edit -->
+<div id="editModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeEditModal()">&times;</span>
+    <h3>Sửa Khuyến mãi</h3>
+    <form id="edit-form">
+      <input type="hidden" id="edit-id" name="id" />
+      <div class="form-grid">
+        <input type="text" id="edit-code" name="code" placeholder="Mã" class="ant-input" required />
+        <input type="text" id="edit-name" name="name" placeholder="Tên" class="ant-input" required />
+        <select id="edit-type" name="type" class="ant-input" required>
+          <option value="percent">Giảm theo %</option>
+          <option value="fixed">Giảm cố định</option>
+        </select>
+        <input type="number" id="edit-value" name="value" placeholder="Giá trị" class="ant-input" min="0" required />
+        <input type="number" id="edit-minOrder" name="minOrder" placeholder="Đơn tối thiểu" class="ant-input" min="0" />
+        <input type="date" id="edit-startDate" name="startDate" class="ant-input" required />
+        <input type="date" id="edit-endDate" name="endDate" class="ant-input" required />
+        <input type="number" id="edit-usageLimit" name="usageLimit" placeholder="Giới hạn" class="ant-input" min="1" />
+      </div>
+      <div style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn-reset" onclick="closeEditModal()" style="margin-right: 10px;">Hủy</button>
+        <button type="submit" class="btn-custom" style="width: auto; padding: 10px 20px;">Cập nhật</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  async function loadPromotions() {
+    const grid = document.getElementById("promotionGrid");
+    try {
+      const res = await fetch("/api/promotions");
+      if (!res.ok) throw new Error("Không thể tải");
+      const promotions = await res.json();
+
+      if (promotions.length > 0) {
+        grid.innerHTML = promotions.map(p => `
+          <div class="promotion-card">
+            <h4>${p.name}</h4>
+            <p><strong>Mã:</strong> ${p.code}</p>
+            <p><strong>Loại:</strong> ${p.type === 'percent' ? `${p.value}%` : `${p.value.toLocaleString()} VNĐ`}</p>
+            <p><strong>Đơn tối thiểu:</strong> ${p.minOrder ? p.minOrder.toLocaleString() + ' VNĐ' : 'Không'}</p>
+            <p><strong>Hiệu lực:</strong> ${new Date(p.startDate).toLocaleDateString()} → ${new Date(p.endDate).toLocaleDateString()}</p>
+            <p><strong>Giới hạn:</strong> ${p.usageLimit} lần</p>
+            <p><span class="badge ${p.isActive ? 'badge-active' : 'badge-inactive'}">${p.isActive ? 'Hoạt động' : 'Dừng'}</span></p>
+            <div style="margin-top: 12px;">
+              <button class="btn-edit" onclick="editPromotion('${p._id}', '${p.code}', '${p.name}', '${p.type}', ${p.value}, ${p.minOrder || 0}, '${p.startDate.split('T')[0]}', '${p.endDate.split('T')[0]}', ${p.usageLimit})">Sửa</button>
+              <button class="btn-delete" onclick="deletePromotion('${p._id}')">Xóa</button>
+            </div>
+          </div>
+        `).join("");
+      } else {
+        grid.innerHTML = '<p style="text-align: center; padding: 20px;">Chưa có khuyến mãi nào.</p>';
+      }
+    } catch (err) {
+      grid.innerHTML = '<p style="color: red; text-align: center;">Lỗi: ' + err.message + '</p>';
+    }
+  }
+
+  // CREATE
+  document.getElementById("promotion-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    data.value = Number(data.value);
+    data.minOrder = data.minOrder ? Number(data.minOrder) : 0;
+    data.usageLimit = Number(data.usageLimit);
+
+    try {
+      const res = await fetch("/api/promotions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Thất bại");
+      alert("Thêm thành công!");
+      e.target.reset();
+      loadPromotions();
+    } catch (err) {
+      alert("Lỗi: " + err.message);
+    }
+  });
+
+  // EDIT - OPEN
+  window.editPromotion = (id, code, name, type, value, minOrder, startDate, endDate, usageLimit) => {
+    document.getElementById('edit-id').value = id;
+    document.getElementById('edit-code').value = code;
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-type').value = type;
+    document.getElementById('edit-value').value = value;
+    document.getElementById('edit-minOrder').value = minOrder;
+    document.getElementById('edit-startDate').value = startDate;
+    document.getElementById('edit-endDate').value = endDate;
+    document.getElementById('edit-usageLimit').value = usageLimit;
+    document.getElementById('editModal').style.display = 'block';
+  };
+
+  // EDIT - SUBMIT
+  document.getElementById("edit-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    data.value = Number(data.value);
+    data.minOrder = data.minOrder ? Number(data.minOrder) : 0;
+    data.usageLimit = Number(data.usageLimit);
+    const id = data.id;
+
+    try {
+      const res = await fetch(`/api/promotions/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Cập nhật thất bại");
+      alert("Cập nhật thành công!");
+      closeEditModal();
+      loadPromotions();
+    } catch (err) {
+      alert("Lỗi: " + err.message);
+    }
+  });
+
+  window.closeEditModal = () => {
+    document.getElementById('editModal').style.display = 'none';
+  };
+
+  // DELETE
+  window.deletePromotion = async (id) => {
+    if (confirm("Xóa khuyến mãi này?")) {
+      try {
+        const res = await fetch(`/api/promotions/${id}`, { method: "DELETE" });
+        if (res.ok) {
+          alert("Xóa thành công!");
+          loadPromotions();
+        }
+      } catch (e) {
+        alert("Lỗi xóa!");
+      }
+    }
+  };
+
+  window.onclick = (e) => {
+    if (e.target === document.getElementById('editModal')) closeEditModal();
+  };
+
+  loadPromotions();
+});
+</script>

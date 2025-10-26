@@ -1,0 +1,82 @@
+<!-- src/views/partials/shipping.ejs -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
+<link rel="stylesheet" href="/css/globe.css" />
+
+<div class="shipping-container">
+  <h2 style="margin-bottom: 1rem;">Quản lý Vận chuyển</h2>
+
+  <form id="shipping-form" class="form-section">
+    <div class="form-grid">
+      <input type="text" name="name" placeholder="Tên đơn vị" class="ant-input" required />
+      <input type="number" name="fee" placeholder="Phí (VNĐ)" class="ant-input" min="0" required />
+      <input type="number" name="freeThreshold" placeholder="Miễn phí từ (VNĐ)" class="ant-input" min="0" />
+    </div>
+    <div class="button-row">
+      <button type="submit" class="btn-custom">Tạo phương thức</button>
+      <button type="reset" class="btn-reset">Đặt lại</button>
+    </div>
+  </form>
+
+  <div class="shipping-grid" id="shippingGrid"></div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  async function loadShipping() {
+    const grid = document.getElementById("shippingGrid");
+    try {
+      const res = await fetch("/api/shipping");
+      const methods = await res.json();
+      grid.innerHTML = methods.map(m => `
+        <div class="shipping-card">
+          <h4>${m.name}</h4>
+          <p><strong>Phí:</strong> ${m.fee.toLocaleString()} VNĐ</p>
+          <p><strong>Miễn phí từ:</strong> ${m.freeThreshold ? m.freeThreshold.toLocaleString() + ' VNĐ' : 'Không'}</p>
+          <div style="margin-top: 12px;">
+            <button class="btn-edit" onclick="editShipping('${m._id}', '${m.name}', ${m.fee}, ${m.freeThreshold || 0})">Sửa</button>
+            <button class="btn-delete" onclick="deleteShipping('${m._id}')">Xóa</button>
+          </div>
+        </div>
+      `).join("") || "<p style='text-align: center;'>Chưa có phương thức vận chuyển.</p>";
+    } catch (err) {
+      grid.innerHTML = "<p style='color: red;'>Lỗi tải dữ liệu</p>";
+    }
+  }
+
+  document.getElementById("shipping-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    data.fee = Number(data.fee);
+    data.freeThreshold = data.freeThreshold ? Number(data.freeThreshold) : null;
+
+    try {
+      const res = await fetch("/api/shipping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Thất bại");
+      alert("Thêm thành công!");
+      e.target.reset();
+      loadShipping();
+    } catch (err) {
+      alert("Lỗi: " + err.message);
+    }
+  });
+
+  window.editShipping = (id, name, fee, freeThreshold) => {
+    // Tương tự modal như size
+    alert("Chức năng chỉnh sửa sẽ được thêm sau (giống size)");
+  };
+
+  window.deleteShipping = async (id) => {
+    if (confirm("Xóa phương thức này?")) {
+      await fetch(`/api/shipping/${id}`, { method: "DELETE" });
+      loadShipping();
+    }
+  };
+
+  loadShipping();
+});
+</script>

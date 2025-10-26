@@ -1,0 +1,154 @@
+<!-- src/views/admin/partials/color.ejs - GIỐNG SIZE 100% -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
+<link rel="stylesheet" href="/css/globe.css">
+
+<div class="color-container">
+  <h2 style="margin-bottom: 1rem;">Quản lý Màu</h2>
+
+  <form id="color-form" class="form-section">
+    <div class="form-grid">
+      <input type="text" name="name" id="colorName" placeholder="Tên màu (VD: Đỏ)" class="ant-input" required />
+      <input type="text" name="code" id="colorCode" placeholder="Mã màu (#FF0000)" class="ant-input" required />
+    </div>
+    <div class="button-row">
+      <button type="submit" class="btn-custom">🎨 Tạo Màu</button>
+      <button type="reset" class="btn-reset">Đặt lại</button>
+    </div>
+  </form>
+
+  <div class="color-grid" id="colorGrid"></div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="editModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeEditModal()">&times;</span>
+    <h3>✏️ Sửa Màu</h3>
+    <form id="edit-form">
+      <input type="hidden" id="edit-id" name="id" />
+      <div class="form-grid">
+        <input type="text" id="edit-name" name="name" placeholder="Tên màu" class="ant-input" required />
+        <input type="text" id="edit-code" name="code" placeholder="Mã màu" class="ant-input" required />
+      </div>
+      <div style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn-reset" onclick="closeEditModal()" style="margin-right: 10px;">Hủy</button>
+        <button type="submit" class="btn-custom" style="width: auto; padding: 10px 20px;">💾 Cập nhật</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const colorNameInput = document.getElementById("colorName");
+  const colorCodeInput = document.getElementById("colorCode");
+
+  // ✅ CHROMA SYNC
+  colorNameInput.addEventListener("input", () => {
+    try {
+      const name = colorNameInput.value.trim();
+      if (name && chroma.valid(name)) colorCodeInput.value = chroma(name).hex();
+    } catch (e) {}
+  });
+  colorCodeInput.addEventListener("input", () => {
+    try {
+      const code = colorCodeInput.value.trim();
+      if (code && chroma.valid(code)) {
+        const name = chroma(code).name();
+        colorNameInput.value = name.charAt(0).toUpperCase() + name.slice(1);
+      }
+    } catch (e) {}
+  });
+
+  async function loadColors() {
+    const colorGrid = document.getElementById("colorGrid");
+    try {
+      const res = await fetch("/api/colors");
+      if (!res.ok) throw new Error("Không thể tải màu");
+      const colors = await res.json();
+      colorGrid.innerHTML = colors.map(color => `
+        <div class="color-card">
+          <div class="color-preview" style="background-color: ${color.code};"></div>
+          <h4>${color.name}</h4>
+          <p><strong>Mã:</strong> ${color.code}</p>
+          <p><small>📅 ${new Date(color.createdAt).toLocaleDateString()}</small></p>
+          <div style="margin-top: 12px;">
+            <button class="btn-edit" onclick="editColor('${color._id}', '${color.name}', '${color.code}')">✏️ Sửa</button>
+            <button class="btn-delete" onclick="deleteColor('${color._id}')">🗑️ Xóa</button>
+          </div>
+        </div>
+      `).join("") || '<p style="text-align: center; padding: 20px;">Chưa có màu nào.</p>';
+    } catch (error) {
+      colorGrid.innerHTML = '<p style="text-align: center; padding: 20px;">Lỗi: ' + error.message + '</p>';
+    }
+  }
+
+  // ✅ CREATE
+  document.getElementById("color-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const colorData = {
+      name: formData.get('name').trim(),
+      code: formData.get('code').trim()
+    };
+    try {
+      const res = await fetch("/api/colors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(colorData)
+      });
+      if (!res.ok) { const errorData = await res.json(); throw new Error(errorData.error || "Thêm màu thất bại"); }
+      alert("✅ Thêm màu thành công!");
+      e.target.reset();
+      loadColors();
+    } catch (error) { alert("❌ " + error.message); }
+  });
+
+  // ✅ EDIT
+  window.editColor = (id, name, code) => {
+    document.getElementById('edit-id').value = id;
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-code').value = code;
+    document.getElementById('editModal').style.display = 'block';
+  };
+
+  document.getElementById("edit-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const colorData = {
+      name: formData.get('name').trim(),
+      code: formData.get('code').trim()
+    };
+    const id = formData.get('id');
+    try {
+      const res = await fetch(`/api/colors/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(colorData)
+      });
+      if (!res.ok) { const errorData = await res.json(); throw new Error(errorData.error || "Cập nhật thất bại"); }
+      alert("✅ Cập nhật thành công!");
+      closeEditModal();
+      loadColors();
+    } catch (error) { alert("❌ " + error.message); }
+  });
+
+  window.closeEditModal = () => document.getElementById('editModal').style.display = 'none';
+  window.deleteColor = async (id) => {
+    if (confirm("Xóa màu này?")) {
+      try {
+        const res = await fetch(`/api/colors/${id}`, { method: "DELETE" });
+        if (res.ok) { alert("✅ Xóa thành công!"); loadColors(); }
+      } catch (e) { alert("❌ Lỗi xóa!"); }
+    }
+  };
+  window.onclick = (event) => {
+    const modal = document.getElementById('editModal');
+    if (event.target == modal) closeEditModal();
+  };
+
+  loadColors();
+});
+</script>

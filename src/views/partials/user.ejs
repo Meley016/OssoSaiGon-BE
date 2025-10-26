@@ -1,0 +1,380 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css">
+<link rel="stylesheet" href="/css/globe.css"  >
+
+<div class="user-container">
+  <h2 class="title">Quản lý Người dùng & Loyalty ✨</h2>
+
+  <div style="margin-bottom:1rem;">
+    <button onclick="openCreateModal()" class="btn-custom add-btn">+ Thêm người dùng</button>
+    <button onclick="openLoyaltyModal()" class="btn-custom add-btn" style="margin-left:1rem;">⚙ Loyalty</button>
+  </div>
+
+  <!-- FILTER -->
+  <div class="form-grid filter-grid">
+    <select id="filterRole" class="ant-input" onchange="applyFilters()">
+      <option value="">Vai trò</option>
+      <option value="user">👤 User</option>
+      <option value="admin">🛡 Admin</option>
+    </select>
+
+    <select id="filterTier" class="ant-input" onchange="applyFilters()">
+      <option value="">Tier</option>
+    </select>
+
+    <select id="filterBlocked" class="ant-input" onchange="applyFilters()">
+      <option value="">Trạng thái</option>
+      <option value="true">🔴 Bị khóa</option>
+      <option value="false">🟢 Hoạt động</option>
+    </select>
+  </div>
+
+  <div class="table-container">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Avatar</th>
+          <th onclick="toggleSortName()" style="cursor:pointer">
+            Họ tên <span id="sortNameIcon">⇅</span>
+          </th>
+          <th>Email</th>
+          <th>Vai trò</th>
+          <th>Tier</th>
+          <th onclick="toggleSortPoints()" style="cursor:pointer">
+            Điểm <span id="sortPointIcon">⇅</span>
+          </th>
+          <th>Khóa</th>
+          <th>Hành động</th>
+        </tr>
+      </thead>
+      <tbody id="userTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="userModal" class="modal">
+  <div class="modal-content modal-large">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <h3 id="modalTitle"></h3>
+
+    <div class="form-grid">
+      <label>Tên</label>
+      <input id="name" class="ant-input" placeholder="Họ tên"/>
+
+      <label>Email</label>
+      <input id="email" class="ant-input" placeholder="Email"/>
+
+      <label>Mật khẩu</label>
+      <input id="password" class="ant-input" type="password" placeholder="Để trống nếu không đổi"/>
+
+      <label>Ảnh đại diện</label>
+      <input id="avatar" class="ant-input" type="file" accept="image/*"/>
+
+      <label>Ngày sinh</label>
+      <input id="birthday" class="ant-input" type="date"/>
+
+      <label>Địa chỉ</label>
+      <textarea id="address" class="ant-input" placeholder="Địa chỉ"></textarea>
+
+      <label>Role</label>
+      <select id="role" class="ant-input">
+        <option value="user">👤 User</option>
+        <option value="admin">🛡 Admin</option>
+      </select>
+
+      <label>Cấp bậc</label>
+      <select id="loyaltyTier" class="ant-input"></select>
+
+      <label>Điểm</label>
+      <input id="loyaltyPoints" class="ant-input" type="number" min="0"/>
+
+      <label>Tài khoản</label>
+      <label><input type="checkbox" id="isBlocked"> 🚫 Bị khóa</label>
+    </div>
+
+    <div class="button-row">
+      <button onclick="saveUser()" class="btn-custom">💾 Lưu</button>
+      <button onclick="closeModal()" class="btn-reset">Đóng</button>
+    </div>
+  </div>
+</div>
+<!-- LOYALTY CONFIG MODAL -->
+<div id="loyaltyModal" class="modal">
+  <div class="modal-content modal-large">
+    <h3 style="margin-bottom:1rem">Cấu hình Loyalty 🎯</h3>
+
+    <label>VND đổi 1 điểm:</label>
+    <input id="exchangeRate" class="ant-input" type="number" min="1" style="width:200px">
+
+    <table class="table" style="margin-top:1rem;">
+      <thead>
+        <tr>
+          <th>Emoji</th>
+          <th>Tên Tier</th>
+          <th>Điểm tối thiểu</th>
+          <th>Xóa</th>
+        </tr>
+      </thead>
+      <tbody id="tierBody"></tbody>
+    </table>
+
+    <div class="button-row" style="margin-top:1rem;">
+      <button class="btn-custom" onclick="addTier()">+ Thêm Tier</button>
+      <button onclick="saveLoyaltyConfig()" class="btn-custom">✅ Lưu</button>
+      <button onclick="closeLoyaltyModal()" class="btn-reset">Đóng</button>
+    </div>
+  </div>
+</div>
+<script>
+let allUsers = [];
+let editId = null;
+let loyaltyConfig = [];
+let loyaltyRate = 10000; // Giá trị mặc định
+let nameSort = "";
+let pointSort = "";
+
+// Khai báo các biến tham chiếu đến element
+const nameInput = document.getElementById("name");
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const avatarInput = document.getElementById("avatar");
+const birthdayInput = document.getElementById("birthday");
+const addressInput = document.getElementById("address");
+const roleSelect = document.getElementById("role");
+const loyaltyTierSelect = document.getElementById("loyaltyTier");
+const loyaltyPointsInput = document.getElementById("loyaltyPoints");
+const isBlockedCheckbox = document.getElementById("isBlocked");
+
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadLoyaltyConfig();
+  await loadUsers();
+});
+
+/* LOAD USERS */
+async function loadUsers() {
+  const res = await fetch("/api/users");
+  allUsers = await res.json();
+  applyFilters();
+}
+
+function applyFilters() {
+  let users = [...allUsers];
+  const role = document.getElementById("filterRole").value;
+  const tier = document.getElementById("filterTier").value;
+  const locked = document.getElementById("filterBlocked").value;
+
+  if (role) users = users.filter(u => u.role === role);
+  if (tier) users = users.filter(u => u.loyalty?.tier === tier);
+  if (locked) users = users.filter(u => String(u.isBlocked) === locked);
+
+  sortUsers(users);
+  renderUsers(users);
+}
+
+/* SORT */
+function sortUsers(users) {
+  if (nameSort) users.sort((a, b) => nameSort === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
+  if (pointSort) users.sort((a, b) => pointSort === "asc" ? (a.loyalty?.points || 0) - (b.loyalty?.points || 0) : (b.loyalty?.points || 0) - (a.loyalty?.points || 0));
+}
+
+function toggleSortName() {
+  pointSort = "";
+  nameSort = nameSort === "asc" ? "desc" : nameSort === "desc" ? "" : "asc";
+  updateSortIcons();
+  applyFilters();
+}
+
+function toggleSortPoints() {
+  nameSort = "";
+  pointSort = pointSort === "asc" ? "desc" : pointSort === "desc" ? "" : "asc";
+  updateSortIcons();
+  applyFilters();
+}
+
+function updateSortIcons() {
+  document.getElementById("sortNameIcon").textContent = nameSort === "asc" ? "⬇" : nameSort === "desc" ? "⬆" : "⇅";
+  document.getElementById("sortPointIcon").textContent = pointSort === "asc" ? "⬇" : pointSort === "desc" ? "⬆" : "⇅";
+}
+
+/* RENDER */
+function renderUsers(users) {
+  document.getElementById("userTable").innerHTML =
+    users.map(u => {
+      const tierItem = loyaltyConfig.find(t => t.key === u.loyalty?.tier);
+      const avatar = u.avatar || "/img/no-avatar.png";
+      return `
+      <tr>
+        <td><img src="${avatar}" class="avatar-sm"></td>
+        <td>${u.name || "-"}</td>
+        <td>${u.email}</td>
+        <td>${u.role}</td>
+        <td>${tierItem ? tierItem.emoji + " " + tierItem.name : "-"}</td>
+        <td>${u.loyalty?.points || 0}</td>
+        <td>${u.isBlocked ? "🔴" : "🟢"}</td>
+        <td>
+          <button class="btn-action" onclick="openEditModal('${u._id}')">Sửa</button>
+          <button class="btn-delete" onclick="deleteUser('${u._id}')">Xóa</button>
+        </td>
+      </tr>`;
+    }).join("");
+}
+
+/* CREATE + EDIT */
+function openCreateModal() {
+  editId = null;
+  document.getElementById("modalTitle").textContent = "Thêm người dùng mới ✨";
+  refreshTierDropdown();
+  fillForm({});
+  document.getElementById("userModal").style.display = "flex";
+}
+
+function openEditModal(id) {
+  const u = allUsers.find(x => x._id === id);
+  editId = id;
+  document.getElementById("modalTitle").textContent = "Cập nhật người dùng 🛠";
+  refreshTierDropdown();
+  fillForm(u);
+  document.getElementById("userModal").style.display = "flex";
+}
+
+function fillForm(u) {
+  nameInput.value = u.name || "";
+  emailInput.value = u.email || "";
+  passwordInput.value = "";
+  birthdayInput.value = u.birthday ? u.birthday.split("T")[0] : "";
+  addressInput.value = u.address || "";
+  roleSelect.value = u.role || "user";
+  loyaltyTierSelect.value = u.loyalty?.tier || loyaltyConfig[0]?.key;
+  loyaltyPointsInput.value = u.loyalty?.points || 0;
+  isBlockedCheckbox.checked = Boolean(u.isBlocked);
+}
+
+function closeModal() {
+  document.getElementById("userModal").style.display = "none";
+}
+
+async function saveUser() {
+  const formData = new FormData();
+  formData.append("name", nameInput.value);
+  formData.append("email", emailInput.value);
+  formData.append("birthday", birthdayInput.value);
+  formData.append("address", addressInput.value);
+  formData.append("role", roleSelect.value);
+  formData.append("loyaltyTier", loyaltyTierSelect.value);
+  formData.append("loyaltyPoints", loyaltyPointsInput.value);
+  formData.append("isBlocked", isBlockedCheckbox.checked);
+
+  console.log("FormData values:", {
+    name: nameInput.value,
+    email: emailInput.value,
+    role: roleSelect.value,
+    loyaltyTier: loyaltyTierSelect.value,
+    loyaltyPoints: loyaltyPointsInput.value,
+    isBlocked: isBlockedCheckbox.checked
+  });
+
+  if (!editId && !passwordInput.value) formData.append("password", "123456");
+  if (passwordInput.value) formData.append("password", passwordInput.value);
+  if (avatarInput.files.length > 0) {
+    formData.append("avatar", avatarInput.files[0]);
+  } else if (editId) {
+    formData.append("avatarKeep", "true");
+  }
+
+  const r = await fetch(editId ? `/api/users/${editId}` : "/api/users", {
+    method: editId ? "PUT" : "POST",
+    body: formData
+  });
+
+  if (!r.ok) {
+    const error = await r.json();
+    return alert("Có lỗi xảy ra: " + (error.error || "Không xác định"));
+  }
+  closeModal();
+  loadUsers();
+}
+
+/* DELETE */
+async function deleteUser(id) {
+  if (!confirm("Xóa người dùng này?")) return;
+  await fetch(`/api/users/${id}`, { method: "DELETE" });
+  loadUsers();
+}
+
+/**************** LOYALTY CONFIG ****************/
+async function loadLoyaltyConfig() {
+  const res = await fetch("/api/users/loyalty/config");
+  const data = await res.json();
+  loyaltyConfig = data.tiers;
+  loyaltyRate = data.pointRate;
+  refreshTierDropdown();
+  refreshTierFilter();
+}
+
+function refreshTierDropdown() {
+  loyaltyTierSelect.innerHTML =
+    loyaltyConfig.map(t => `<option value="${t.key}">${t.emoji} ${t.name}</option>`).join("");
+}
+
+function refreshTierFilter() {
+  document.getElementById("filterTier").innerHTML = `<option value="">Tier</option>` +
+    loyaltyConfig.map(t => `<option value="${t.key}">${t.emoji} ${t.name}</option>`).join("");
+}
+
+/**************** CONFIG UI ****************/
+function openLoyaltyModal() {
+  document.getElementById("exchangeRate").value = loyaltyRate;
+  renderTierTable();
+  document.getElementById("loyaltyModal").style.display = "flex";
+}
+
+function closeLoyaltyModal() {
+  document.getElementById("loyaltyModal").style.display = "none";
+}
+
+function renderTierTable() {
+  document.getElementById("tierBody").innerHTML = loyaltyConfig.map((t, i) => `
+    <tr>
+      <td><input class="emoji-input ant-input" value="${t.emoji}"></td>
+      <td><input class="name-input ant-input" value="${t.name}"></td>
+      <td><input class="points-input ant-input" type="number" min="0" value="${t.minPoints}"></td>
+      <td><button class="btn-delete" onclick="removeTier(${i})">X</button></td>
+    </tr>`).join("");
+}
+
+function addTier() {
+  loyaltyConfig.push({ key: "tier" + Date.now(), emoji: "⭐", name: "Tier mới", minPoints: 0 });
+  renderTierTable();
+}
+
+function removeTier(i) {
+  if (!confirm("Xóa Tier này?")) return;
+  loyaltyConfig.splice(i, 1);
+  renderTierTable();
+}
+
+async function saveLoyaltyConfig() {
+  const rows = [...document.getElementById("tierBody").querySelectorAll("tr")];
+
+  const tiers = rows.map((row, i) => {
+    const t = loyaltyConfig[i];
+    return {
+      key: t.key,
+      emoji: row.querySelector(".emoji-input").value,
+      name: row.querySelector(".name-input").value,
+      minPoints: Number(row.querySelector(".points-input").value)
+    };
+  });
+
+  await fetch("/api/users/loyalty/config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tiers, pointRate: Number(document.getElementById("exchangeRate").value) })
+  });
+
+  alert("Đã lưu thành công 🎉");
+  closeLoyaltyModal();
+  loadLoyaltyConfig();
+}
+</script>

@@ -1,0 +1,50 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="/css/dashboard.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <img src="https://scontent.fsgn8-2.fna.fbcdn.net/v/t39.30808-6/484065696_2519918064878637_3662425263367956365_n.jpg?_nc_cat=106&ccb=1-7&_nc_sid=a5f93a&_nc_eui2=AeGDOwwZhPuJhqj0g8x5yyu4nK_XcWCcVGKcr9dxYJxUYoaRTZ9AQ_a5uTpXyPuji7QJZQ7hgbqusdIdPMhPwzAb&_nc_ohc=tVNQt0TYBQIQ7kNvwFCcCEw&_nc_oc=Adk_dJG_WI2k1tzN4pQlBFIPon9n-ZhQUOv511Ai4Gn2oABXUvg3Zt6m7agwkF_W8GGFjy-dWf9H7Les3Zg_1zKR&_nc_zt=23&_nc_ht=scontent.fsgn8-2.fna&_nc_gid=Qtp8b_sxURKeuAqoxOts_g&oh=00_AfchvsvH9I0ewtRLtOxJZV7_XLOtba7prRAIjvDwgQ2JCA&oe=68FFCAEB" alt="Logo" />
+      <h1>Admin Dashboard</h1>
+    </div>
+    <form action="/admin/logout" method="POST">
+      <button type="submit" class="logout-btn">Đăng xuất</button>
+    </form>
+  </div>
+
+  <!-- Main content -->
+  <div class="content">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <a href="/admin/dashboard/product" class="<%= activeMenu === 'product' ? 'active' : '' %>">Sản phẩm</a>
+      <a href="/admin/dashboard/order" class="<%= activeMenu === 'order' ? 'active' : '' %>">Đơn hàng</a>
+      <a href="/admin/dashboard/user" class="<%= activeMenu === 'user' ? 'active' : '' %>">Người dùng</a>
+      <a href="/admin/dashboard/category" class="<%= activeMenu === 'category' ? 'active' : '' %>">Danh mục</a>
+      <a href="/admin/dashboard/promotion" class="<%= activeMenu === 'promotion' ? 'active' : '' %>">Khuyến mãi</a>
+      <a href="/admin/dashboard/shipping" class="<%= activeMenu === 'shipping' ? 'active' : '' %>">Vận chuyển</a>
+      <!-- Thêm Size và Color -->
+      <a href="/admin/dashboard/size" class="<%= activeMenu === 'size' ? 'active' : '' %>">Size</a>
+      <a href="/admin/dashboard/color" class="<%= activeMenu === 'color' ? 'active' : '' %>">Màu</a>
+    </div>
+
+    <!-- Main area -->
+    <div class="main">
+      <%- include(`../partials/${activeMenu}`, { 
+        activeMenu, 
+        admin, 
+        categories, 
+        sizes, 
+        colors 
+      }) %>
+    </div>
+  </div>
+</body>
+</html>

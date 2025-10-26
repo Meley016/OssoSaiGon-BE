@@ -1,0 +1,132 @@
+<!-- src/views/admin/partials/category.ejs -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
+<link rel="stylesheet" href="/css/globe.css">
+
+<div class="category-container">
+  <h2 class="section-title">Quản lý Danh mục</h2>
+
+  <form id="category-form" class="form-section">
+    <div class="form-grid">
+      <input type="text" name="name" placeholder="Tên danh mục" class="form-input" required />
+      <textarea name="description" placeholder="Mô tả (tùy chọn)" class="form-input" rows="2"></textarea>
+    </div>
+    <div class="button-row">
+      <button type="submit" class="btn btn-primary">Tạo Danh mục</button>
+      <button type="reset" class="btn btn-secondary">Đặt lại</button>
+    </div>
+  </form>
+
+  <div class="category-grid" id="categoryGrid"></div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="editModal" class="modal">
+  <div class="modal-content">
+    <span class="modal-close" onclick="closeEditModal()">&times;</span>
+    <h3>Sửa Danh mục</h3>
+    <form id="edit-form">
+      <input type="hidden" id="edit-id" name="id" />
+      <div class="form-grid">
+        <input type="text" id="edit-name" name="name" placeholder="Tên danh mục" class="form-input" required />
+        <textarea id="edit-description" name="description" placeholder="Mô tả" class="form-input" rows="2"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Hủy</button>
+        <button type="submit" class="btn btn-primary">Cập nhật</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+
+  async function loadCategories() {
+    const grid = document.getElementById("categoryGrid");
+    try {
+      const res = await fetch("/api/categories");
+      if (!res.ok) throw new Error("Không thể tải danh mục");
+      const categories = await res.json();
+      grid.innerHTML = categories.map(cat => `
+        <div class="category-card">
+          <h4>${cat.name}</h4>
+          <p><strong>Mô tả:</strong> ${cat.description || 'Không có'}</p>
+          <p><small>${new Date(cat.createdAt).toLocaleDateString()}</small></p>
+          <div class="card-actions">
+            <button class="btn btn-edit" onclick="editCategory('${cat._id}', '${cat.name}', \`${cat.description || ''}\`)">Sửa</button>
+            <button class="btn btn-delete" onclick="deleteCategory('${cat._id}')">Xóa</button>
+          </div>
+        </div>
+      `).join("") || '<p class="no-data">Chưa có danh mục nào.</p>';
+    } catch (error) {
+      grid.innerHTML = '<p class="error-text">Lỗi: ' + error.message + '</p>';
+    }
+  }
+
+  // CREATE
+  document.getElementById("category-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = {
+      name: formData.get('name').trim(),
+      description: formData.get('description').trim()
+    };
+    if (!data.name) return alert("Tên danh mục không được để trống!");
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Thất bại"); }
+      alert("Thêm danh mục thành công!");
+      e.target.reset();
+      loadCategories();
+    } catch (error) { alert("Lỗi: " + error.message); }
+  });
+
+  // EDIT
+  window.editCategory = (id, name, description) => {
+    document.getElementById('edit-id').value = id;
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-description').value = description;
+    document.getElementById('editModal').style.display = 'block';
+  };
+
+  document.getElementById("edit-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = {
+      name: formData.get('name').trim(),
+      description: formData.get('description').trim()
+    };
+    const id = formData.get('id');
+    try {
+      const res = await fetch(`/api/categories/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Cập nhật thất bại");
+      alert("Cập nhật thành công!");
+      closeEditModal();
+      loadCategories();
+    } catch (error) { alert("Lỗi: " + error.message); }
+  });
+
+  window.deleteCategory = async (id) => {
+    if (confirm("Xóa danh mục này?")) {
+      try {
+        const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
+        if (res.ok) { alert("Xóa thành công!"); loadCategories(); }
+      } catch (e) { alert("Lỗi xóa!"); }
+    }
+  };
+
+  window.closeEditModal = () => document.getElementById('editModal').style.display = 'none';
+  window.onclick = (e) => { if (e.target === document.getElementById('editModal')) closeEditModal(); };
+
+  loadCategories();
+});
+</script>

@@ -1,0 +1,173 @@
+<!-- src/views/partials/size.ejs -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
+<link rel="stylesheet" href="/css/globe.css">
+
+<div class="module-container">
+  <h2 class="module-title">Quản lý Size</h2>
+
+  <!-- FORM TẠO MỚI -->
+  <form id="size-form" class="form-section">
+    <div class="form-grid">
+      <input type="text" name="name" placeholder="Tên Size" class="input-field" required />
+      <input type="text" name="code" placeholder="Mã Size (VD: S)" class="input-field" required />
+    </div>
+
+    <div class="button-row">
+      <button type="submit" class="btn-custom">Tạo Size</button>
+      <button type="reset" class="btn-reset">Đặt lại</button>
+    </div>
+  </form>
+
+  <!-- ✅ DANH SÁCH -->
+  <div class="item-grid" id="sizeGrid"></div>
+</div>
+
+<!-- ✅ EDIT MODAL -->
+<div id="editModal" class="modal">
+  <div class="modal-content">
+    <span class="modal-close" onclick="closeEditModal()">&times;</span>
+    <h3 class="modal-title">Sửa Size</h3>
+
+    <form id="edit-form">
+      <input type="hidden" id="edit-id" name="id" />
+      
+      <div class="form-grid">
+        <input type="text" id="edit-name" name="name" placeholder="Tên Size" class="input-field" required />
+        <input type="text" id="edit-code" name="code" placeholder="Mã Size" class="input-field" required />
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" onclick="closeEditModal()">Hủy</button>
+        <button type="submit" class="btn-primary">Cập nhật</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  async function loadSizes() {
+    const sizeGrid = document.getElementById("sizeGrid");
+    try {
+      const res = await fetch("/api/sizes");
+      if (!res.ok) throw new Error("Không thể tải size");
+      const sizes = await res.json();
+
+      if (Array.isArray(sizes) && sizes.length > 0) {
+        sizeGrid.innerHTML = sizes.map(size => `
+          <div class="size-card">
+            <h4>${size.name}</h4>
+            <p><strong>Mã:</strong> ${size.code}</p>
+            <p><small>📅 ${new Date(size.createdAt).toLocaleDateString()}</small></p>
+            <div style="margin-top: 12px;">
+              <button class="btn-edit" onclick="editSize('${size._id}', '${size.name}', '${size.code}')">✏️ Sửa</button>
+              <button class="btn-delete" onclick="deleteSize('${size._id}')">🗑️ Xóa</button>
+            </div>
+          </div>
+        `).join("");
+      } else {
+        sizeGrid.innerHTML = '<p style="text-align: center; padding: 20px;">Chưa có size nào.</p>';
+      }
+    } catch (error) {
+      console.error("Lỗi khi tải size:", error);
+      sizeGrid.innerHTML = '<p style="text-align: center; padding: 20px;">Lỗi: ' + error.message + '</p>';
+    }
+  }
+
+  // ✅ CREATE
+  document.getElementById("size-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const sizeData = {
+      name: formData.get('name').trim(),
+      code: formData.get('code').trim()
+    };
+    
+    try {
+      const res = await fetch("/api/sizes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sizeData)
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Thêm size thất bại");
+      }
+      
+      alert("✅ Thêm size thành công!");
+      e.target.reset();
+      loadSizes();
+    } catch (error) {
+      alert("❌ " + error.message);
+    }
+  });
+
+  // ✅ EDIT - MỞ MODAL
+  window.editSize = (id, name, code) => {
+    document.getElementById('edit-id').value = id;
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-code').value = code;
+    document.getElementById('editModal').style.display = 'block';
+  };
+
+  // ✅ EDIT - SUBMIT
+  document.getElementById("edit-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const sizeData = {
+      name: formData.get('name').trim(),
+      code: formData.get('code').trim()
+    };
+    const id = formData.get('id');
+    
+    try {
+      const res = await fetch(`/api/sizes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sizeData)
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Cập nhật thất bại");
+      }
+      
+      alert("✅ Cập nhật thành công!");
+      closeEditModal();
+      loadSizes();
+    } catch (error) {
+      alert("❌ " + error.message);
+    }
+  });
+
+  // ✅ CLOSE MODAL
+  window.closeEditModal = () => {
+    document.getElementById('editModal').style.display = 'none';
+  };
+
+  // ✅ DELETE
+  window.deleteSize = async (id) => {
+    if (confirm("Xóa size này?")) {
+      try {
+        const res = await fetch(`/api/sizes/${id}`, { method: "DELETE" });
+        if (res.ok) {
+          alert("✅ Xóa thành công!");
+          loadSizes();
+        }
+      } catch (e) {
+        alert("❌ Lỗi xóa!");
+      }
+    }
+  };
+
+  // ✅ ĐÓNG MODAL KHI CLICK NGOÀI
+  window.onclick = (event) => {
+    const modal = document.getElementById('editModal');
+    if (event.target == modal) closeEditModal();
+  };
+
+  loadSizes();
+});
+</script>

@@ -1,0 +1,103 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: #fff;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.logout-btn {
+  background: red;
+  color: #fff;
+  border: none;
+  padding: 8px 15px;
+  cursor: pointer;
+}
+
+.content {
+  display: flex;
+}
+
+.sidebar {
+  width: 200px;
+  background: #fff;
+  border-right: 1px solid #eee;
+  padding: 20px;
+}
+
+.sidebar a {
+  display: block;
+  padding: 10px;
+  color: #333;
+  text-decoration: none;
+  border-radius: 5px;
+}
+
+.sidebar a.active,
+.sidebar a:hover {
+  background: #fdeaea;
+}
+
+.main {
+  flex: 1;
+  padding: 20px;
+}
+
+.section h2 {
+  margin-bottom: 15px;
+}
+
+.form-product input,
+.form-product textarea,
+.form-product select {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 8px;
+}
+
+.variant-box {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-add-variant,
+.btn-create {
+  background: #fdeaea;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.filter-box {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 15px;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-filter,
+.btn-reset {
+  background: #fdeaea;
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+}

@@ -1,0 +1,92 @@
+<!-- src/views/partials/order.ejs -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
+<link rel="stylesheet" href="/css/globe.css" />
+
+<div class="order-container">
+  <h2 style="margin-bottom: 1rem;">Quản lý Đơn hàng</h2>
+
+  <div class="filter-section">
+    <form id="filter-form">
+      <div class="form-grid">
+        <input type="text" name="orderId" placeholder="Mã đơn" class="ant-input" />
+        <input type="text" name="customer" placeholder="Khách hàng" class="ant-input" />
+        <select name="status" class="ant-input">
+          <option value="">--Trạng thái--</option>
+          <option value="pending">Chờ xử lý</option>
+          <option value="processing">Đang xử lý</option>
+          <option value="shipped">Đã giao</option>
+          <option value="cancelled">Hủy</option>
+        </select>
+        <input type="date" name="from" class="ant-input" />
+        <input type="date" name="to" class="ant-input" />
+      </div>
+      <div style="margin-top: 16px;">
+        <button type="submit" class="btn-custom">Lọc</button>
+        <button type="reset" class="btn-custom" style="background: #f5f5f5; border: 1px solid #ddd; margin-left: 8px;">Xóa lọc</button>
+      </div>
+    </form>
+  </div>
+
+  <table class="table" id="orderTable">
+    <thead>
+      <tr>
+        <th>Mã đơn</th>
+        <th>Khách hàng</th>
+        <th>Sản phẩm</th>
+        <th>Tổng tiền</th>
+        <th>Trạng thái</th>
+        <th>Ngày đặt</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const tbody = document.querySelector("#orderTable tbody");
+
+  async function loadOrders(filters = {}) {
+    const params = new URLSearchParams(filters);
+    try {
+      const res = await fetch(`/api/orders?${params}`);
+      const orders = await res.json();
+      tbody.innerHTML = orders.map(o => `
+        <tr>
+          <td>#${o.orderId}</td>
+          <td>${o.customerName}<br><small>${o.customerEmail}</small></td>
+          <td>${o.items.map(i => `${i.name} × ${i.quantity}`).join('<br>')}</td>
+          <td>${o.total.toLocaleString()} VNĐ</td>
+          <td><span class="status status-${o.status}">${getStatusText(o.status)}</span></td>
+          <td>${new Date(o.createdAt).toLocaleDateString('vi-VN')}</td>
+          <td>
+            <button class="btn-custom" style="font-size: 12px; padding: 4px 8px;" onclick="viewOrder('${o._id}')">Xem</button>
+          </td>
+        </tr>
+      `).join("") || "<tr><td colspan='7' style='text-align: center;'>Chưa có đơn hàng</td></tr>";
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan='7' style='color: red;'>Lỗi tải đơn hàng</td></tr>`;
+    }
+  }
+
+  function getStatusText(status) {
+    const map = { pending: "Chờ xử lý", processing: "Đang xử lý", shipped: "Đã giao", cancelled: "Hủy" };
+    return map[status] || status;
+  }
+
+  window.viewOrder = (id) => {
+    window.location.href = `/admin/order/${id}`;
+  };
+
+  document.getElementById("filter-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    Object.keys(data).forEach(k => !data[k] && delete data[k]);
+    loadOrders(data);
+  });
+
+  loadOrders();
+});
+</script>

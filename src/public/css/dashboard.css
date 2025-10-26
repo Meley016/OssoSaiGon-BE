@@ -1,0 +1,17 @@
+/* src/public/css/dashboard.css */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #f8f9fa; min-height: 100vh; display: flex; flex-direction: column; }
+
+.header { background: #fff; display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 1.5rem; box-shadow: 0 2px 6px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 10; }
+.header .logo { display: flex; align-items: center; gap: 10px; }
+.header img { width: 65px; height: 65px; object-fit: cover; }
+.header h1 { font-size: 1.3rem; font-weight: 700; color: #333; }
+.logout-btn { background: #dc3545; color: #fff; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
+
+.content { display: flex; flex: 1; overflow: hidden; }
+.sidebar { width: 20%; background: #fff; border-right: 1px solid #e2e8f0; padding: 2rem 0; box-shadow: 1px 0 4px rgba(0,0,0,0.05); }
+.sidebar a { padding: 20px 16px; text-decoration: none; color: #333; display: block; font-weight: 700; border-left: 4px solid transparent; transition: 0.2s; }
+.sidebar a:hover { background: #f8d7da; color: #c82333; }
+.sidebar a.active { background: #fde8e8; color: #c82333; border-left-color: #c82333; }
+
+.main { flex: 1; background: #f8f9fa; padding: 1.5rem; overflow-y: auto; }
