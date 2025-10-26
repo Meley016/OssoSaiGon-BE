@@ -8,7 +8,7 @@ const fs = require("fs");
 require("dotenv").config();
  
 const connectDB = require("./config/database");
- 
+  
 // === IMPORT ROUTES ===
 const authRoutes = require("./routes/auth");
 const productRoutes = require("./routes/products");
