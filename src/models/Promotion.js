@@ -1,15 +1,34 @@
-const mongoose = require("mongoose");
+// src/models/Promotion.js
+const mongoose = require('mongoose');
 
 const promotionSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true },
   name: { type: String, required: true },
-  type: { type: String, enum: ["percent", "fixed"], required: true },
+  description: String,
+  type: { type: String, enum: ['percentage', 'fixed', 'free_shipping', 'buy_x_get_y'], required: true },
   value: { type: Number, required: true },
-  minOrder: { type: Number, default: 0 },
+  maxDiscount: Number,
+  minOrderValue: Number,
+  minQuantity: Number,
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },
-  usageLimit: { type: Number, default: 1 },
-  usedCount: { type: Number, default: 0 }
-}, { timestamps: true });
-module.exports = mongoose.model("Promotion", promotionSchema);
+  usageLimit: Number,
+  applyType: { type: String, enum: ['user', 'product', 'category'], required: true },
+  usageLimitPerUser: Number,
+  isNewUserOnly: Boolean,
+  userLevels: [String],
+  productIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+  categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
+  usageLimitPerProduct: Number,
+  buyQuantity: Number,
+  getQuantity: Number,
+  getProductId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    required: function() {
+      return this.type === 'buy_x_get_y'; // Chỉ bắt buộc cho buy_x_get_y
+    }
+  }
+});
 
+module.exports = mongoose.model('Promotion', promotionSchema);

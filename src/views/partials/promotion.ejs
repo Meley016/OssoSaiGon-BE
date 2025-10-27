@@ -3,180 +3,784 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
 <link rel="stylesheet" href="/css/globe.css" />
 
-<div class="promotion-container">
-  <h2 style="margin-bottom: 1 уси;">Quản lý Khuyến mãi</h2>
+<div class="container">
+  <!-- Notification -->
+  <div id="notification" class="notification"></div>
 
+  <!-- Form -->
+  <div class="form-section">
+    <form id="promotion-form">
+      <input type="hidden" name="_id" />
+     <h2 style="margin-bottom: 20px;">Quản lý Khuyến mãi</h2>
 
-  <form id="promotion-form" class="form-section">
-    <div class="form-grid">
-      <input type="text" name="code" placeholder="Mã khuyến mãi" class="ant-input" required />
-      <input type="text" name="name" placeholder="Tên chương trình" class="ant-input" required />
-      <select name="type" class="ant-input" required>
-        <option value="">--Loại--</option>
-        <option value="percent">Giảm theo %</option>
-        <option value="fixed">Giảm cố định (VNĐ)</option>
-      </select>
-      <input type="number" name="value" placeholder="Giá trị" class="ant-input" min="0" required />
-      <input type="number" name="minOrder" placeholder="Đơn tối thiểu (VNĐ)" class="ant-input" min="0" />
-      <input type="date" name="startDate" class="ant-input" required />
-      <input type="date" name="endDate" class="ant-input" required />
-      <input type="number" name="usageLimit" placeholder="Giới hạn sử dụng" class="ant-input" min="1" />
-    </div>
-    <div class="button-row">
-      <button type="submit" class="btn-custom">Tạo khuyến mãi</button>
-      <button type="reset" class="btn-reset">Đặt lại</button>
-    </div>
-  </form>
-
-  <!-- Danh sách -->
-  <div class="promotion-grid" id="promotionGrid"></div>
-</div>
-
-<!-- Modal Edit -->
-<div id="editModal" class="modal">
-  <div class="modal-content">
-    <span class="close" onclick="closeEditModal()">&times;</span>
-    <h3>Sửa Khuyến mãi</h3>
-    <form id="edit-form">
-      <input type="hidden" id="edit-id" name="id" />
       <div class="form-grid">
-        <input type="text" id="edit-code" name="code" placeholder="Mã" class="ant-input" required />
-        <input type="text" id="edit-name" name="name" placeholder="Tên" class="ant-input" required />
-        <select id="edit-type" name="type" class="ant-input" required>
-          <option value="percent">Giảm theo %</option>
-          <option value="fixed">Giảm cố định</option>
-        </select>
-        <input type="number" id="edit-value" name="value" placeholder="Giá trị" class="ant-input" min="0" required />
-        <input type="number" id="edit-minOrder" name="minOrder" placeholder="Đơn tối thiểu" class="ant-input" min="0" />
-        <input type="date" id="edit-startDate" name="startDate" class="ant-input" required />
-        <input type="date" id="edit-endDate" name="endDate" class="ant-input" required />
-        <input type="number" id="edit-usageLimit" name="usageLimit" placeholder="Giới hạn" class="ant-input" min="1" />
+        <div class="ant-form-item">
+          <label>Mã khuyến mãi <span class="required">*</span></label>
+          <input type="text" name="code" placeholder="VD: SALE2025" class="ant-input" required />
+        </div>
+        <div class="ant-form-item">
+          <label>Tên khuyến mãi <span class="required">*</span></label>
+          <input type="text" name="name" placeholder="VD: Giảm giá T-Shirt" class="ant-input" required />
+        </div>
+        <div class="ant-form-item">
+          <label>Loại khuyến mãi <span class="required">*</span></label>
+          <select name="type" id="typeSelect" class="ant-input" required>
+            <option value="">--Chọn loại--</option>
+            <option value="percentage">Giảm theo %</option>
+            <option value="fixed">Giảm cố định (VNĐ)</option>
+            <option value="free_shipping">Miễn phí vận chuyển</option>
+            <option value="buy_x_get_y">Mua X tặng Y</option>
+          </select>
+        </div>
+        <div class="ant-form-item">
+          <label>Giá trị <span class="required">*</span></label>
+          <input type="number" name="value" placeholder="VD: 10 (% hoặc VNĐ)" class="ant-input" min="0" required />
+        </div>
+        <div class="ant-form-item">
+          <label>Giảm tối đa (VNĐ)</label>
+          <input type="number" name="maxDiscount" placeholder="VD: 50000" class="ant-input" min="0" />
+        </div>
+        <div class="ant-form-item">
+          <label>Đơn tối thiểu (VNĐ)</label>
+          <input type="number" name="minOrderValue" placeholder="VD: 100000" class="ant-input" min="0" />
+        </div>
+        <div class="ant-form-item">
+          <label>Số lượng tối thiểu</label>
+          <input type="number" name="minQuantity" placeholder="VD: 2" class="ant-input" min="0" />
+        </div>
+        <div class="ant-form-item">
+          <label>Ngày bắt đầu <span class="required">*</span></label>
+          <input type="date" name="startDate" class="ant-input" required />
+        </div>
+        <div class="ant-form-item">
+          <label>Ngày kết thúc <span class="required">*</span></label>
+          <input type="date" name="endDate" class="ant-input" required />
+        </div>
+        <div class="ant-form-item">
+          <label>Tổng lượt sử dụng</label>
+          <input type="number" name="usageLimit" placeholder="VD: 100" class="ant-input" min="0" />
+        </div>
+        <div class="ant-form-item">
+          <label>Áp dụng cho <span class="required">*</span></label>
+          <select name="applyType" id="applyType" class="ant-input" required>
+            <option value="">--Chọn đối tượng--</option>
+            <option value="category">Danh mục</option>
+            <option value="product">Sản phẩm</option>
+            <option value="user">Người dùng</option>
+          </select>
+        </div>
+        <div class="ant-form-item" id="applySummary">
+          <label>Tóm tắt lựa chọn</label>
+          <div id="applySummaryText" style="padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; min-height: 32px;">
+            Chưa chọn đối tượng
+          </div>
+        </div>
+        <div class="ant-form-item">
+          <label>Mô tả</label>
+          <textarea name="description" class="ant-input" rows="3" placeholder="Mô tả chương trình khuyến mãi"></textarea>
+        </div>
       </div>
-      <div style="text-align: right; margin-top: 20px;">
-        <button type="button" class="btn-reset" onclick="closeEditModal()" style="margin-right: 10px;">Hủy</button>
-        <button type="submit" class="btn-custom" style="width: auto; padding: 10px 20px;">Cập nhật</button>
+
+      <!-- Hidden inputs for data -->
+      <input type="hidden" name="usageLimitPerUser" />
+      <input type="hidden" name="isNewUserOnly" />
+      <input type="hidden" name="usageLimitPerProduct" />
+      <input type="hidden" name="buyQuantity" />
+      <input type="hidden" name="getQuantity" />
+
+      <!-- BUY X GET Y -->
+      <div id="buy-x-get-y-box" class="apply-box" style="display: none;">
+        <div class="ant-form-item">
+          <label>Số lượng mua</label>
+          <input type="number" name="buyQuantity" placeholder="VD: 2" class="ant-input" min="0" />
+        </div>
+        <div class="ant-form-item">
+          <label>Số lượng tặng</label>
+          <input type="number" name="getQuantity" placeholder="VD: 1" class="ant-input" min="0" />
+        </div>
+        <div class="ant-form-item">
+          <label>Sản phẩm tặng <span class="required">*</span></label>
+          <select id="getProductSelect" name="getProductId" class="ant-input" required></select>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button type="button" class="btn-custom" onclick="previewPromotion()">Xem trước</button>
+        <button type="submit" class="btn-custom submit-btn">Tạo khuyến mãi</button>
+        <button type="reset" class="btn-reset" onclick="resetForm()">Đặt lại</button>
       </div>
     </form>
+  </div>
+
+  <!-- Modal -->
+  <div id="customModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h3 id="modalTitle"></h3>
+      <div id="modalContent"></div>
+      <div class="modal-actions">
+        <button class="btn-reset" onclick="closeModal()">Hủy</button>
+        <button class="btn-custom" onclick="confirmModal()">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="promotion-table">
+    <table class="ant-table">
+      <thead>
+        <tr>
+          <th>Mã</th>
+          <th>Tên</th>
+          <th>Loại</th>
+          <th>Giá trị</th>
+          <th>Áp dụng</th>
+          <th>Thời gian</th>
+          <th>Lượt dùng</th>
+          <th>Trạng thái</th>
+          <th>Hành động</th>
+        </tr>
+      </thead>
+      <tbody id="promotionGrid"></tbody>
+    </table>
   </div>
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-  async function loadPromotions() {
-    const grid = document.getElementById("promotionGrid");
-    try {
-      const res = await fetch("/api/promotions");
-      if (!res.ok) throw new Error("Không thể tải");
-      const promotions = await res.json();
+  let productsRes = [], categoriesRes = [], ranksRes = [];
+  let selectValues = {
+    productIds: [],
+    categoryIds: [],
+    getProductId: "",
+    userLevels: [],
+  };
+  let tempApplyType = "";
 
-      if (promotions.length > 0) {
-        grid.innerHTML = promotions.map(p => `
-          <div class="promotion-card">
-            <h4>${p.name}</h4>
-            <p><strong>Mã:</strong> ${p.code}</p>
-            <p><strong>Loại:</strong> ${p.type === 'percent' ? `${p.value}%` : `${p.value.toLocaleString()} VNĐ`}</p>
-            <p><strong>Đơn tối thiểu:</strong> ${p.minOrder ? p.minOrder.toLocaleString() + ' VNĐ' : 'Không'}</p>
-            <p><strong>Hiệu lực:</strong> ${new Date(p.startDate).toLocaleDateString()} → ${new Date(p.endDate).toLocaleDateString()}</p>
-            <p><strong>Giới hạn:</strong> ${p.usageLimit} lần</p>
-            <p><span class="badge ${p.isActive ? 'badge-active' : 'badge-inactive'}">${p.isActive ? 'Hoạt động' : 'Dừng'}</span></p>
-            <div style="margin-top: 12px;">
-              <button class="btn-edit" onclick="editPromotion('${p._id}', '${p.code}', '${p.name}', '${p.type}', ${p.value}, ${p.minOrder || 0}, '${p.startDate.split('T')[0]}', '${p.endDate.split('T')[0]}', ${p.usageLimit})">Sửa</button>
-              <button class="btn-delete" onclick="deletePromotion('${p._id}')">Xóa</button>
-            </div>
-          </div>
-        `).join("");
-      } else {
-        grid.innerHTML = '<p style="text-align: center; padding: 20px;">Chưa có khuyến mãi nào.</p>';
-      }
+  const form = document.getElementById("promotion-form");
+  const applyTypeSelect = document.getElementById("applyType");
+  const typeSelect = document.getElementById("typeSelect");
+  const applySummaryText = document.getElementById("applySummaryText");
+  const modal = document.getElementById("customModal");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalContent = document.getElementById("modalContent");
+  const notification = document.getElementById("notification");
+
+  // Hiển thị thông báo
+  function showNotification(message, type = "error") {
+    notification.textContent = message;
+    notification.className = `notification ${type}`;
+    notification.style.display = "block";
+    setTimeout(() => (notification.style.display = "none"), 3000);
+  }
+
+  // Hiển thị/hide box buy_x_get_y
+  typeSelect.onchange = () => {
+    const isBuyXGetY = typeSelect.value === "buy_x_get_y";
+    document.getElementById("buy-x-get-y-box").style.display = isBuyXGetY ? "block" : "none";
+    document.getElementById("getProductSelect").required = isBuyXGetY;
+  };
+
+  // Tải dữ liệu cho select
+  async function loadOptions() {
+    try {
+      const [resP, resC, resR] = await Promise.all([
+        fetch("/api/products", { credentials: "include" }).then(async (res) => {
+          if (!res.ok) throw new Error(`Lỗi API sản phẩm: ${res.status} ${await res.text()}`);
+          return res.json();
+        }),
+        fetch("/api/categories", { credentials: "include" }).then(async (res) => {
+          if (!res.ok) throw new Error(`Lỗi API danh mục: ${res.status} ${await res.text()}`);
+          return res.json();
+        }),
+        fetch("/api/users/loyalty/config", { credentials: "include" }).then(async (res) => {
+          if (!res.ok) throw new Error(`Lỗi API cấp bậc: ${res.status} ${await res.text()}`);
+          return res.json();
+        }),
+      ]);
+
+      productsRes = resP.products || [];
+      categoriesRes = resC || [];
+      ranksRes = resR.tiers || [];
+
+      // Cập nhật getProductSelect
+      const getProductSelect = document.getElementById("getProductSelect");
+      getProductSelect.innerHTML = '<option value="">Chọn sản phẩm tặng</option>' +
+        productsRes.map(p => `<option value="${p._id}">${p.name}</option>`).join("");
     } catch (err) {
-      grid.innerHTML = '<p style="color: red; text-align: center;">Lỗi: ' + err.message + '</p>';
+      console.error("Lỗi tải dữ liệu:", err);
+      showNotification(`Lỗi tải dữ liệu: ${err.message}`);
     }
   }
 
-  // CREATE
-  document.getElementById("promotion-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.target));
-    data.value = Number(data.value);
-    data.minOrder = data.minOrder ? Number(data.minOrder) : 0;
-    data.usageLimit = Number(data.usageLimit);
-
-    try {
-      const res = await fetch("/api/promotions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error((await res.json()).error || "Thất bại");
-      alert("Thêm thành công!");
-      e.target.reset();
-      loadPromotions();
-    } catch (err) {
-      alert("Lỗi: " + err.message);
+  // Cập nhật tóm tắt lựa chọn
+  function updateApplySummary() {
+    const applyType = form.applyType.value;
+    if (!applyType) {
+      applySummaryText.textContent = "Chưa chọn đối tượng";
+      return;
     }
-  });
+    if (applyType === "user") {
+      const userLevels = selectValues.userLevels.length
+        ? ranksRes.filter(r => selectValues.userLevels.includes(r.key)).map(r => `<span class="badge ${r.key}">${r.name}</span>`).join(" ")
+        : "Tất cả";
+      const isNewUserOnly = form.isNewUserOnly.value === "true" ? " (Chỉ người dùng mới)" : "";
+      const usageLimitPerUser = form.usageLimitPerUser.value || "Không giới hạn";
+      applySummaryText.innerHTML = `Người dùng: ${userLevels}${isNewUserOnly}, ${usageLimitPerUser} lượt/người`;
+    } else if (applyType === "product") {
+      const products = selectValues.productIds.length
+        ? productsRes.filter(p => selectValues.productIds.includes(p._id)).map(p => p.name).join(", ")
+        : "Không";
+      const usageLimitPerProduct = form.usageLimitPerProduct.value || "Không giới hạn";
+      applySummaryText.textContent = `Sản phẩm: ${products}, ${usageLimitPerProduct} lượt/sản phẩm`;
+    } else if (applyType === "category") {
+      const categories = selectValues.categoryIds.length
+        ? categoriesRes.filter(c => selectValues.categoryIds.includes(c._id)).map(c => c.name).join(", ")
+        : "Không";
+      applySummaryText.textContent = `Danh mục: ${categories}`;
+    }
+  }
 
-  // EDIT - OPEN
-  window.editPromotion = (id, code, name, type, value, minOrder, startDate, endDate, usageLimit) => {
-    document.getElementById('edit-id').value = id;
-    document.getElementById('edit-code').value = code;
-    document.getElementById('edit-name').value = name;
-    document.getElementById('edit-type').value = type;
-    document.getElementById('edit-value').value = value;
-    document.getElementById('edit-minOrder').value = minOrder;
-    document.getElementById('edit-startDate').value = startDate;
-    document.getElementById('edit-endDate').value = endDate;
-    document.getElementById('edit-usageLimit').value = usageLimit;
-    document.getElementById('editModal').style.display = 'block';
+  // Hiển thị modal
+  function showModal() {
+    modal.style.display = "block";
+    modalTitle.textContent = `Chọn đối tượng áp dụng: ${tempApplyType === "user" ? "Người dùng" : tempApplyType === "product" ? "Sản phẩm" : "Danh mục"}`;
+    let content = `
+      <div class="form-grid">
+        ${tempApplyType === "user" ? `
+          <div class="ant-form-item">
+            <label>Số lượt mỗi người dùng</label>
+            <input type="number" id="modalUsageLimitPerUser" value="${form.usageLimitPerUser.value || ""}" placeholder="VD: 1" class="ant-input" min="0" />
+          </div>
+          <div class="ant-form-item">
+            <label>Loại người dùng</label>
+            <select id="modalIsNewUserOnly" class="ant-input">
+              <option value="false" ${form.isNewUserOnly.value === "false" ? "selected" : ""}>Tất cả</option>
+              <option value="true" ${form.isNewUserOnly.value === "true" ? "selected" : ""}>Chỉ người dùng mới</option>
+            </select>
+          </div>
+          <div class="ant-form-item">
+            <label>Cấp bậc người dùng (<span id="selectedCount">0</span> đã chọn)</label>
+            <input type="text" id="userSearch" placeholder="Tìm kiếm cấp bậc" class="ant-input" />
+            <div class="item-grid">
+              <button class="btn-custom" onclick="selectAll('userLevel')">Chọn tất cả</button>
+              <button class="btn-reset" onclick="deselectAll('userLevel')">Bỏ chọn</button>
+              ${ranksRes.map(r => `
+                <div class="item-card">
+                  <label>
+                    <input type="checkbox" class="userLevel" value="${r.key}" ${selectValues.userLevels.includes(r.key) ? "checked" : ""} onchange="updateSelectedCount('userLevel', 'selectedCount')" />
+                    <span class="badge ${r.key}">${r.name}</span>
+                  </label>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        ` : tempApplyType === "product" ? `
+          <div class="ant-form-item">
+            <label>Sản phẩm áp dụng (<span id="selectedCount">0</span> đã chọn)</label>
+            <input type="text" id="productSearch" placeholder="Tìm kiếm sản phẩm" class="ant-input" />
+            <div class="item-grid">
+              <button class="btn-custom" onclick="selectAll('product')">Chọn tất cả</button>
+              <button class="btn-reset" onclick="deselectAll('product')">Bỏ chọn</button>
+              ${productsRes.map(p => `
+                <div class="item-card">
+                  <label>
+                    <input type="checkbox" class="product" value="${p._id}" ${selectValues.productIds.includes(p._id) ? "checked" : ""} onchange="updateSelectedCount('product', 'selectedCount')" />
+                    ${p.birthImage ? `<img src="${p.birthImage}" alt="${p.name}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; margin-right: 8px;" />` : ""}
+                    ${p.name}
+                  </label>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+          <div class="ant-form-item">
+            <label>Số lượt mỗi sản phẩm</label>
+            <input type="number" id="modalUsageLimitPerProduct" value="${form.usageLimitPerProduct.value || ""}" placeholder="VD: 10" class="ant-input" min="0" />
+          </div>
+        ` : `
+          <div class="ant-form-item">
+            <label>Danh mục áp dụng (<span id="selectedCount">0</span> đã chọn)</label>
+            <input type="text" id="categorySearch" placeholder="Tìm kiếm danh mục" class="ant-input" />
+            <div class="item-grid">
+              <button class="btn-custom" onclick="selectAll('category')">Chọn tất cả</button>
+              <button class="btn-reset" onclick="deselectAll('category')">Bỏ chọn</button>
+              ${categoriesRes.map(c => `
+                <div class="item-card">
+                  <label>
+                    <input type="checkbox" class="category" value="${c._id}" ${selectValues.categoryIds.includes(c._id) ? "checked" : ""} onchange="updateSelectedCount('category', 'selectedCount')" />
+                    ${c.name}
+                  </label>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `}
+      </div>
+    `;
+    modalContent.innerHTML = content;
+
+    // Cập nhật số lượng đã chọn
+    updateSelectedCount(tempApplyType === "user" ? "userLevel" : tempApplyType === "product" ? "product" : "category", "selectedCount");
+
+    // Thêm chức năng tìm kiếm
+    const searchInput = modalContent.querySelector(`#${tempApplyType === "user" ? "userSearch" : tempApplyType === "product" ? "productSearch" : "categorySearch"}`);
+    if (searchInput) {
+      searchInput.oninput = () => {
+        const query = searchInput.value.toLowerCase();
+        const items = modalContent.querySelectorAll(".item-card");
+        items.forEach(item => {
+          const text = item.textContent.toLowerCase();
+          item.style.display = text.includes(query) ? "block" : "none";
+        });
+      };
+    }
+  }
+
+  // Cập nhật số lượng đã chọn
+  function updateSelectedCount(className, countId) {
+    const checkedCount = document.querySelectorAll(`.${className}:checked`).length;
+    document.getElementById(countId).textContent = checkedCount;
+  }
+
+  // Chọn tất cả
+  window.selectAll = (className) => {
+    document.querySelectorAll(`.${className}`).forEach(c => c.checked = true);
+    updateSelectedCount(className, "selectedCount");
   };
 
-  // EDIT - SUBMIT
-  document.getElementById("edit-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.target));
-    data.value = Number(data.value);
-    data.minOrder = data.minOrder ? Number(data.minOrder) : 0;
-    data.usageLimit = Number(data.usageLimit);
-    const id = data.id;
-
-    try {
-      const res = await fetch(`/api/promotions/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error((await res.json()).error || "Cập nhật thất bại");
-      alert("Cập nhật thành công!");
-      closeEditModal();
-      loadPromotions();
-    } catch (err) {
-      alert("Lỗi: " + err.message);
-    }
-  });
-
-  window.closeEditModal = () => {
-    document.getElementById('editModal').style.display = 'none';
+  // Bỏ chọn tất cả
+  window.deselectAll = (className) => {
+    document.querySelectorAll(`.${className}`).forEach(c => c.checked = false);
+    updateSelectedCount(className, "selectedCount");
   };
 
-  // DELETE
-  window.deletePromotion = async (id) => {
-    if (confirm("Xóa khuyến mãi này?")) {
-      try {
-        const res = await fetch(`/api/promotions/${id}`, { method: "DELETE" });
-        if (res.ok) {
-          alert("Xóa thành công!");
-          loadPromotions();
-        }
-      } catch (e) {
-        alert("Lỗi xóa!");
+  // Đóng modal
+  window.closeModal = () => {
+    modal.style.display = "none";
+    applyTypeSelect.value = form.applyType.value || "";
+  };
+
+  // Xác nhận modal
+  window.confirmModal = () => {
+    // Đặt lại tất cả selectValues trước khi cập nhật
+    selectValues = {
+      productIds: [],
+      categoryIds: [],
+      getProductId: selectValues.getProductId,
+      userLevels: [],
+    };
+    form.usageLimitPerUser.value = "";
+    form.isNewUserOnly.value = "false";
+    form.usageLimitPerProduct.value = "";
+
+    if (tempApplyType === "user") {
+      selectValues.userLevels = Array.from(modalContent.querySelectorAll('.userLevel:checked')).map(c => c.value);
+      form.usageLimitPerUser.value = document.getElementById("modalUsageLimitPerUser").value;
+      form.isNewUserOnly.value = document.getElementById("modalIsNewUserOnly").value;
+      if (!selectValues.userLevels.length) {
+        showNotification("Vui lòng chọn ít nhất một cấp bậc");
+        return;
+      }
+    } else if (tempApplyType === "product") {
+      selectValues.productIds = Array.from(modalContent.querySelectorAll('.product:checked')).map(c => c.value);
+      form.usageLimitPerProduct.value = document.getElementById("modalUsageLimitPerProduct").value;
+      if (!selectValues.productIds.length) {
+        showNotification("Vui lòng chọn ít nhất một sản phẩm");
+        return;
+      }
+    } else if (tempApplyType === "category") {
+      selectValues.categoryIds = Array.from(modalContent.querySelectorAll('.category:checked')).map(c => c.value);
+      if (!selectValues.categoryIds.length) {
+        showNotification("Vui lòng chọn ít nhất một danh mục");
+        return;
       }
     }
+    form.applyType.value = tempApplyType;
+    updateApplySummary();
+    modal.style.display = "none";
   };
 
-  window.onclick = (e) => {
-    if (e.target === document.getElementById('editModal')) closeEditModal();
+  // Xử lý thay đổi applyType
+  applyTypeSelect.onchange = () => {
+    tempApplyType = applyTypeSelect.value;
+    if (!tempApplyType) {
+      applySummaryText.textContent = "Chưa chọn đối tượng";
+      return;
+    }
+    showModal();
   };
 
+  // Tải danh sách khuyến mãi
+  async function loadPromotions() {
+    const grid = document.getElementById("promotionGrid");
+    try {
+      const res = await fetch("/api/promotions", { credentials: "include" });
+      if (!res.ok) throw new Error(`Lỗi API khuyến mãi: ${res.status} ${await res.text()}`);
+      const promotions = await res.json();
+
+      grid.innerHTML = promotions
+        .map(
+          (p) => `
+          <tr>
+            <td>${p.code}</td>
+            <td>${p.name}</td>
+            <td>${
+              p.type === "percentage"
+                ? "Giảm %"
+                : p.type === "fixed"
+                ? "Cố định"
+                : p.type === "free_shipping"
+                ? "Miễn phí vận chuyển"
+                : "Mua X tặng Y"
+            }</td>
+            <td>${p.value}${p.type === "percentage" ? "%" : p.type === "fixed" ? " VNĐ" : ""}</td>
+            <td>${
+              p.applyType === "user"
+                ? `Người dùng (${p.userLevels.map(l => `<span class="badge ${l}">${l}</span>`).join(" ") || "Tất cả"})`
+                : p.applyType === "product"
+                ? `Sản phẩm (${p.productIds.map(p => p.name).join(", ") || "Không"})`
+                : `Danh mục (${p.categoryIds.map(c => c.name).join(", ") || "Không"})`
+            }</td>
+            <td>${new Date(p.startDate).toLocaleDateString("vi-VN")} - ${new Date(p.endDate).toLocaleDateString("vi-VN")}</td>
+            <td>${p.usedCount}/${p.usageLimit || "∞"}</td>
+            <td><span class="badge ${p.isActive ? "badge-active" : "badge-inactive"}">${p.isActive ? "Đang hoạt động" : "Đã tắt"}</span></td>
+            <td>
+              <button class="btn-edit" onclick="editPromotion('${p._id}')">Sửa</button>
+              <button class="btn-edit" onclick="togglePromotion('${p._id}', ${p.isActive})">${p.isActive ? "Tắt" : "Bật"}</button>
+              <button class="btn-delete" onclick="deletePromotion('${p._id}')">Xóa</button>
+            </td>
+          </tr>
+        `
+        )
+        .join("") || '<tr><td colspan="9" style="text-align:center;padding:20px;">Chưa có khuyến mãi nào.</td></tr>';
+    } catch (err) {
+      console.error("Lỗi tải khuyến mãi:", err);
+      showNotification(`Lỗi tải khuyến mãi: ${err.message}`);
+      grid.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;">Lỗi tải khuyến mãi!</td></tr>';
+    }
+  }
+
+  // Chỉnh sửa khuyến mãi
+  window.editPromotion = async (id) => {
+    try {
+      const res = await fetch(`/api/promotions/${id}`, { credentials: "include" });
+      if (!res.ok) throw new Error(`Lỗi API khuyến mãi: ${res.status} ${await res.text()}`);
+      const p = await res.json();
+
+      // Đặt lại selectValues
+      selectValues = {
+        productIds: [],
+        categoryIds: [],
+        getProductId: "",
+        userLevels: [],
+      };
+      form.usageLimitPerUser.value = "";
+      form.isNewUserOnly.value = "false";
+      form.usageLimitPerProduct.value = "";
+
+      form._id.value = p._id;
+      form.code.value = p.code;
+      form.name.value = p.name;
+      form.description.value = p.description || "";
+      form.type.value = p.type;
+      form.value.value = p.value;
+      form.maxDiscount.value = p.maxDiscount || "";
+      form.minOrderValue.value = p.minOrderValue || "";
+      form.minQuantity.value = p.minQuantity || "";
+      form.startDate.value = p.startDate.split("T")[0];
+      form.endDate.value = p.endDate.split("T")[0];
+      form.usageLimit.value = p.usageLimit || "";
+      form.applyType.value = p.applyType;
+
+      if (p.applyType === "user") {
+        selectValues.userLevels = p.userLevels;
+        form.usageLimitPerUser.value = p.usageLimitPerUser || "";
+        form.isNewUserOnly.value = p.isNewUserOnly.toString();
+      } else if (p.applyType === "product") {
+        selectValues.productIds = p.productIds.map(p => p._id);
+        form.usageLimitPerProduct.value = p.usageLimitPerProduct || "";
+      } else if (p.applyType === "category") {
+        selectValues.categoryIds = p.categoryIds.map(c => c._id);
+      }
+
+      form.buyQuantity.value = p.buyQuantity || "";
+      form.getQuantity.value = p.getQuantity || "";
+      selectValues.getProductId = p.getProductId?._id || "";
+
+      const getProductSelect = document.getElementById("getProductSelect");
+      getProductSelect.innerHTML = '<option value="">Chọn sản phẩm tặng</option>' +
+        productsRes.map(p => `<option value="${p._id}" ${p._id === selectValues.getProductId ? "selected" : ""}>${p.name}</option>`).join("");
+      updateApplySummary();
+      typeSelect.onchange();
+      document.querySelector(".submit-btn").textContent = "Cập nhật";
+    } catch (err) {
+      console.error("Lỗi chỉnh sửa khuyến mãi:", err);
+      showNotification(`Lỗi tải thông tin khuyến mãi: ${err.message}`);
+    }
+  };
+
+  // Bật/tắt khuyến mãi
+  window.togglePromotion = async (id, isActive) => {
+    if (!confirm(`${isActive ? "Tắt" : "Bật"} khuyến mãi này?`)) return;
+    try {
+      const res = await fetch(`/api/promotions/${id}/toggle`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`Lỗi bật/tắt khuyến mãi: ${res.status} ${await res.text()}`);
+      showNotification(`${isActive ? "Tắt" : "Bật"} khuyến mãi thành công!`, "success");
+      loadPromotions();
+    } catch (err) {
+      console.error("Lỗi bật/tắt khuyến mãi:", err);
+      showNotification(`Lỗi: ${err.message}`);
+    }
+  };
+
+  // Xóa khuyến mãi
+  window.deletePromotion = async (id) => {
+    if (!confirm("Xóa khuyến mãi này?")) return;
+    try {
+      const res = await fetch(`/api/promotions/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`Lỗi xóa khuyến mãi: ${res.status} ${await res.text()}`);
+      showNotification("Xóa khuyến mãi thành công!", "success");
+      loadPromotions();
+    } catch (err) {
+      console.error("Lỗi xóa khuyến mãi:", err);
+      showNotification(`Lỗi: ${err.message}`);
+    }
+  };
+
+  // Xem trước khuyến mãi
+  window.previewPromotion = () => {
+    const formData = new FormData(form);
+    const data = {
+      code: formData.get("code"),
+      name: formData.get("name"),
+      description: formData.get("description"),
+      type: formData.get("type"),
+      value: Number(formData.get("value") || 0),
+      maxDiscount: Number(formData.get("maxDiscount") || 0),
+      minOrderValue: Number(formData.get("minOrderValue") || 0),
+      minQuantity: Number(formData.get("minQuantity") || 0),
+      startDate: formData.get("startDate"),
+      endDate: formData.get("endDate"),
+      usageLimit: Number(formData.get("usageLimit") || 0),
+      applyType: formData.get("applyType"),
+      usageLimitPerUser: Number(formData.get("usageLimitPerUser") || 0),
+      isNewUserOnly: formData.get("isNewUserOnly") === "true",
+      userLevels: selectValues.userLevels,
+      productIds: selectValues.productIds,
+      categoryIds: selectValues.categoryIds,
+      usageLimitPerProduct: Number(formData.get("usageLimitPerProduct") || 0),
+      buyQuantity: Number(formData.get("buyQuantity") || 0),
+      getQuantity: Number(formData.get("getQuantity") || 0),
+    };
+
+    modalTitle.textContent = "Xem trước khuyến mãi";
+    modalContent.innerHTML = `
+      <div class="form-grid">
+        <div class="ant-form-item">
+          <label><strong>Mã:</strong></label>
+          <div>${data.code}</div>
+        </div>
+        <div class="ant-form-item">
+          <label><strong>Tên:</strong></label>
+          <div>${data.name}</div>
+        </div>
+        <div class="ant-form-item">
+          <label><strong>Mô tả:</strong></label>
+          <div>${data.description || "Không có"}</div>
+        </div>
+        <div class="ant-form-item">
+          <label><strong>Loại:</strong></label>
+          <div>${data.type === "percentage" ? "Giảm %" : data.type === "fixed" ? "Cố định" : data.type === "free_shipping" ? "Miễn phí vận chuyển" : "Mua X tặng Y"}</div>
+        </div>
+        <div class="ant-form-item">
+          <label><strong>Giá trị:</strong></label>
+          <div>${data.value}${data.type === "percentage" ? "%" : data.type === "fixed" ? " VNĐ" : ""}</div>
+        </div>
+        <div class="ant-form-item">
+          <label><strong>Giảm tối đa:</strong></label>
+          <div>${data.maxDiscount || "Không giới hạn"} VNĐ</div>
+        </div>
+        <div class="ant-form-item">
+          <label><strong>Đơn tối thiểu:</strong></label>
+          <div>${data.minOrderValue || 0} VNĐ</div>
+        </div>
+        <div class="ant-form-item">
+          <label><strong>Số lượng tối thiểu:</strong></label>
+          <div>${data.minQuantity || 0}</div>
+        </div>
+        <div class="ant-form-item">
+          <label><strong>Thời gian:</strong></label>
+          <div>${new Date(data.startDate).toLocaleDateString("vi-VN")} - ${new Date(data.endDate).toLocaleDateString("vi-VN")}</div>
+        </div>
+        <div class="ant-form-item">
+          <label><strong>Tổng lượt sử dụng:</strong></label>
+          <div>${data.usageLimit || "Không giới hạn"}</div>
+        </div>
+        <div class="ant-form-item">
+          <label><strong>Áp dụng cho:</strong></label>
+          <div>${data.applyType === "user" ? "Người dùng" : data.applyType === "product" ? "Sản phẩm" : "Danh mục"}</div>
+        </div>
+        ${data.applyType === "user" ? `
+          <div class="ant-form-item">
+            <label><strong>Số lượt mỗi người dùng:</strong></label>
+            <div>${data.usageLimitPerUser || "Không giới hạn"}</div>
+          </div>
+          <div class="ant-form-item">
+            <label><strong>Cấp bậc:</strong></label>
+            <div>${data.userLevels.length ? data.userLevels.map(l => `<span class="badge ${l}">${l}</span>`).join(" ") : "Tất cả"}</div>
+          </div>
+          <div class="ant-form-item">
+            <label><strong>Chỉ người dùng mới:</strong></label>
+            <div>${data.isNewUserOnly ? "Có" : "Không"}</div>
+          </div>
+        ` : ""}
+        ${data.applyType === "product" ? `
+          <div class="ant-form-item">
+            <label><strong>Sản phẩm:</strong></label>
+            <div>${productsRes.filter(p => data.productIds.includes(p._id)).map(p => p.name).join(", ") || "Không"}</div>
+          </div>
+          <div class="ant-form-item">
+            <label><strong>Số lượt mỗi sản phẩm:</strong></label>
+            <div>${data.usageLimitPerProduct || "Không giới hạn"}</div>
+          </div>
+        ` : ""}
+        ${data.applyType === "category" ? `
+          <div class="ant-form-item">
+            <label><strong>Danh mục:</strong></label>
+            <div>${categoriesRes.filter(c => data.categoryIds.includes(c._id)).map(c => c.name).join(", ") || "Không"}</div>
+          </div>
+        ` : ""}
+        ${data.type === "buy_x_get_y" ? `
+          <div class="ant-form-item">
+            <label><strong>Mua:</strong></label>
+            <div>${data.buyQuantity} sản phẩm</div>
+          </div>
+          <div class="ant-form-item">
+            <label><strong>Tặng:</strong></label>
+            <div>${data.getQuantity} ${productsRes.find(p => p._id === data.getProductId)?.name || "Không"}</div>
+          </div>
+        ` : ""}
+      </div>
+    `;
+    modal.style.display = "block";
+    modalContent.parentElement.querySelector(".modal-actions").innerHTML = '<button class="btn-custom" onclick="closeModal()">Đóng</button>';
+  };
+
+  // Đặt lại form
+  window.resetForm = () => {
+    form.reset();
+    selectValues = { productIds: [], categoryIds: [], getProductId: "", userLevels: [] };
+    form.applyType.value = "";
+    form.usageLimitPerUser.value = "";
+    form.isNewUserOnly.value = "false";
+    form.usageLimitPerProduct.value = "";
+    form.buyQuantity.value = "";
+    form.getQuantity.value = "";
+    const getProductSelect = document.getElementById("getProductSelect");
+    getProductSelect.innerHTML = '<option value="">Chọn sản phẩm tặng</option>' +
+      productsRes.map(p => `<option value="${p._id}">${p.name}</option>`).join("");
+    updateApplySummary();
+    typeSelect.onchange();
+    document.querySelector(".submit-btn").textContent = "Tạo khuyến mãi";
+  };
+
+  // Gửi form
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    console.log("Form đã được gửi");
+
+    const requiredFields = ["code", "name", "type", "value", "startDate", "endDate", "applyType"];
+    const formData = new FormData(form);
+    for (let field of requiredFields) {
+      if (!formData.get(field)) {
+        showNotification(`Vui lòng điền ${field === "code" ? "mã khuyến mãi" : field === "name" ? "tên khuyến mãi" : field === "type" ? "loại khuyến mãi" : field === "value" ? "giá trị" : field === "startDate" ? "ngày bắt đầu" : field === "endDate" ? "ngày kết thúc" : "đối tượng áp dụng"}`);
+        return;
+      }
+    }
+
+    const data = {
+      code: formData.get("code"),
+      name: formData.get("name"),
+      description: formData.get("description"),
+      type: formData.get("type"),
+      value: Number(formData.get("value") || 0),
+      maxDiscount: Number(formData.get("maxDiscount") || 0),
+      minOrderValue: Number(formData.get("minOrderValue") || 0),
+      minQuantity: Number(formData.get("minQuantity") || 0),
+      startDate: formData.get("startDate"),
+      endDate: formData.get("endDate"),
+      usageLimit: Number(formData.get("usageLimit") || 0),
+      applyType: formData.get("applyType"),
+    };
+
+    // Chỉ thêm các trường liên quan đến applyType được chọn
+    if (data.applyType === "user") {
+      data.usageLimitPerUser = Number(formData.get("usageLimitPerUser") || 0);
+      data.isNewUserOnly = formData.get("isNewUserOnly") === "true";
+      data.userLevels = selectValues.userLevels || [];
+      data.productIds = [];
+      data.categoryIds = [];
+      data.usageLimitPerProduct = 0;
+    } else if (data.applyType === "product") {
+      data.productIds = selectValues.productIds || [];
+      data.usageLimitPerProduct = Number(formData.get("usageLimitPerProduct") || 0);
+      data.userLevels = [];
+      data.categoryIds = [];
+      data.usageLimitPerUser = 0;
+      data.isNewUserOnly = false;
+    } else if (data.applyType === "category") {
+      data.categoryIds = selectValues.categoryIds || [];
+      data.userLevels = [];
+      data.productIds = [];
+      data.usageLimitPerUser = 0;
+      data.isNewUserOnly = false;
+      data.usageLimitPerProduct = 0;
+    }
+
+    // Chỉ thêm getProductId nếu type là buy_x_get_y
+    if (data.type === "buy_x_get_y") {
+      data.buyQuantity = Number(formData.get("buyQuantity") || 0);
+      data.getQuantity = Number(formData.get("getQuantity") || 0);
+      if (formData.get("getProductId")) {
+        data.getProductId = formData.get("getProductId");
+      }
+    } else {
+      data.buyQuantity = 0;
+      data.getQuantity = 0;
+      data.getProductId = undefined;
+    }
+
+    const id = formData.get("_id");
+    const method = id ? "PUT" : "POST";
+    const url = id ? `/api/promotions/${id}` : "/api/promotions";
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+
+      if (res.ok) {
+        showNotification(id ? "Cập nhật thành công!" : "Tạo khuyến mãi thành công!", "success");
+        resetForm();
+        loadPromotions();
+      } else {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Lỗi xử lý yêu cầu");
+      }
+    } catch (err) {
+      console.error("Lỗi gửi form:", err);
+      showNotification(`Lỗi: ${err.message}`);
+    }
+  });
+
+  loadOptions();
   loadPromotions();
-});
 </script>

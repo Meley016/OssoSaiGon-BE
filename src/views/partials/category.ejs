@@ -8,16 +8,16 @@
 
   <form id="category-form" class="form-section">
     <div class="form-grid">
-      <input type="text" name="name" placeholder="Tên danh mục" class="form-input" required />
-      <textarea name="description" placeholder="Mô tả (tùy chọn)" class="form-input" rows="2"></textarea>
+      <input type="text" name="name" placeholder="Tên danh mục" class="input-field" required />
+      <textarea name="description" placeholder="Mô tả (tùy chọn)" class="input-field" rows="2"></textarea>
     </div>
     <div class="button-row">
-      <button type="submit" class="btn btn-primary">Tạo Danh mục</button>
-      <button type="reset" class="btn btn-secondary">Đặt lại</button>
+      <button type="submit" class="btn-custom">Tạo Danh mục</button>
+      <button type="reset" class="btn-reset">Đặt lại</button>
     </div>
   </form>
 
-  <div class="category-grid" id="categoryGrid"></div>
+  <div class="item-grid" id="categoryGrid"></div>
 </div>
 
 <!-- EDIT MODAL -->
@@ -28,12 +28,12 @@
     <form id="edit-form">
       <input type="hidden" id="edit-id" name="id" />
       <div class="form-grid">
-        <input type="text" id="edit-name" name="name" placeholder="Tên danh mục" class="form-input" required />
-        <textarea id="edit-description" name="description" placeholder="Mô tả" class="form-input" rows="2"></textarea>
+        <input type="text" id="edit-name" name="name" placeholder="Tên danh mục" class="ant-input" required />
+        <textarea id="edit-description" name="description" placeholder="Mô tả" class="ant-input" rows="2"></textarea>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Hủy</button>
-        <button type="submit" class="btn btn-primary">Cập nhật</button>
+        <button type="button" class="btn-delete" onclick="closeEditModal()">Hủy</button>
+        <button type="submit" class="btn-edit">Cập nhật</button>
       </div>
     </form>
   </div>
@@ -48,18 +48,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       const res = await fetch("/api/categories");
       if (!res.ok) throw new Error("Không thể tải danh mục");
       const categories = await res.json();
-      grid.innerHTML = categories.map(cat => `
-        <div class="category-card">
-          <h4>${cat.name}</h4>
-          <p><strong>Mô tả:</strong> ${cat.description || 'Không có'}</p>
-          <p><small>${new Date(cat.createdAt).toLocaleDateString()}</small></p>
-          <div class="card-actions">
-            <button class="btn btn-edit" onclick="editCategory('${cat._id}', '${cat.name}', \`${cat.description || ''}\`)">Sửa</button>
-            <button class="btn btn-delete" onclick="deleteCategory('${cat._id}')">Xóa</button>
+
+      if (Array.isArray(categories) && categories.length > 0) {
+        grid.innerHTML = categories.map(cat => `
+          <div class="size-card">
+            <h4>${cat.name}</h4>
+            <p><strong>Mô tả:</strong> ${cat.description || 'Không có'}</p>
+            <p><small>${new Date(cat.createdAt).toLocaleDateString()}</small></p>
+            <div style="margin-top: 12px;">
+              <button class="btn btn-edit" onclick="editCategory('${cat._id}', '${cat.name}', \`${cat.description || ''}\`)">Sửa</button>
+              <button class="btn btn-delete" onclick="deleteCategory('${cat._id}')">Xóa</button>
+            </div>
           </div>
-        </div>
-      `).join("") || '<p class="no-data">Chưa có danh mục nào.</p>';
-    } catch (error) {
+        `).join("");
+      } else {
+        grid.innerHTML = '<p style="text-align: center; padding: 20px;">Chưa có danh mục nào.</p>';
+      }
+    }  catch (error) {
       grid.innerHTML = '<p class="error-text">Lỗi: ' + error.message + '</p>';
     }
   }
