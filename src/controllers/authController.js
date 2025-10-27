@@ -62,8 +62,25 @@ exports.login = async (req, res) => {
 };
 
 exports.logout = (req, res) => {
-  req.session.destroy((err) => {
-    if (err) console.error("Logout error:", err);
+  try {
+    // Xóa token lưu trên cookie nếu có
+    res.clearCookie("token", { path: "/" });
+
+    // Hủy session backend
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.status(500).send("Logout failed");
+      }
+
+      // Xóa cookie session id
+      res.clearCookie("connect.sid", { path: "/" });
+
+      // Trở về trang đăng nhập, reset trạng thái UI
+      res.redirect("/admin/login");
+    });
+  } catch (e) {
+    console.error("Logout exception:", e);
     res.redirect("/admin/login");
-  });
+  }
 };

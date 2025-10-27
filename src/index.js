@@ -1,5 +1,4 @@
 //src/index.js
-
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
@@ -19,7 +18,7 @@ const promotionRoutes = require("./routes/promotions");
 const orderRoutes = require("./routes/orders");
 const userRoutes = require("./routes/user");
 const shippingRoutes = require("./routes/shipping");
-
+const cookieParser = require("cookie-parser");
 // === IMPORT CONTROLLER ===
 const dashboardController = require("./controllers/dashboardController");
 
@@ -32,7 +31,7 @@ const PORT = process.env.PORT || 3000;
 // === CẤU HÌNH VIEWS & STATIC ===
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views")); // ĐÚNG: src/views
-
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));           // ĐÚNG: src/public
 app.use("/uploads", express.static(path.join(__dirname, "../uploads"))); // ĐÚNG: server/uploads
 
@@ -73,10 +72,9 @@ app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/colors", colorRoutes);
 app.use("/api/sizes", sizeRoutes);
-// === NEW CRUD API (Users - Shipping - Promotions - Orders) ===
 app.use("/api/users", userRoutes);
 app.use("/api/shipping", shippingRoutes);
-app.use("/api/promotions", promotionRoutes);
+app.use("/api/promotions", promotionRoutes); 
 app.use("/api/orders", orderRoutes);
 
 

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -8,7 +7,6 @@
   <link rel="stylesheet" href="/css/dashboard.css" />
 </head>
 <body>
-
   <!-- Header -->
   <div class="header">
     <div class="logo">
@@ -23,20 +21,21 @@
   <!-- Main content -->
   <div class="content">
     <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
       <a href="/admin/dashboard/product" class="<%= activeMenu === 'product' ? 'active' : '' %>">Sản phẩm</a>
       <a href="/admin/dashboard/order" class="<%= activeMenu === 'order' ? 'active' : '' %>">Đơn hàng</a>
       <a href="/admin/dashboard/user" class="<%= activeMenu === 'user' ? 'active' : '' %>">Người dùng</a>
       <a href="/admin/dashboard/category" class="<%= activeMenu === 'category' ? 'active' : '' %>">Danh mục</a>
       <a href="/admin/dashboard/promotion" class="<%= activeMenu === 'promotion' ? 'active' : '' %>">Khuyến mãi</a>
       <a href="/admin/dashboard/shipping" class="<%= activeMenu === 'shipping' ? 'active' : '' %>">Vận chuyển</a>
-      <!-- Thêm Size và Color -->
       <a href="/admin/dashboard/size" class="<%= activeMenu === 'size' ? 'active' : '' %>">Size</a>
       <a href="/admin/dashboard/color" class="<%= activeMenu === 'color' ? 'active' : '' %>">Màu</a>
+      <!-- Nút toggle sidebar -->
+      <button id="toggleSidebar" class="toggle-sidebar-btn">&lt;</button>
     </div>
 
     <!-- Main area -->
-    <div class="main">
+    <div class="main" id="mainContent">
       <%- include(`../partials/${activeMenu}`, { 
         activeMenu, 
         admin, 
@@ -46,5 +45,29 @@
       }) %>
     </div>
   </div>
+
+  <script>
+    // JavaScript để xử lý toggle sidebar
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('mainContent');
+    const toggleBtn = document.getElementById('toggleSidebar');
+
+    // Kiểm tra trạng thái sidebar từ localStorage
+    const isSidebarHidden = localStorage.getItem('sidebarHidden') === 'true';
+    if (isSidebarHidden) {
+      sidebar.classList.add('hidden');
+      mainContent.classList.add('expanded');
+      toggleBtn.innerHTML = '&gt;';
+    }
+
+    toggleBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('hidden');
+      mainContent.classList.toggle('expanded');
+      const isHidden = sidebar.classList.contains('hidden');
+      toggleBtn.innerHTML = isHidden ? '&gt;' : '&lt;';
+      // Lưu trạng thái vào localStorage
+      localStorage.setItem('sidebarHidden', isHidden);
+    });
+  </script>
 </body>
 </html>
