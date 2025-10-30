@@ -1,0 +1,181 @@
+<link rel="stylesheet" href="/css/globe.css" />
+<div class="container">
+  <h2 class="title">Quản lý Banner & Logo</h2>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button id="tab-banner" class="tab active">Banner</button>
+    <button id="tab-logo" class="tab">Logo</button>
+  </div>
+
+  <!-- BANNER SECTION -->
+  <div id="banner-section" class="tab-content active">
+    <div class="form-section">
+      <form id="promotion-form" enctype="multipart/form-data">
+        <input type="hidden" name="type" value="banner" />
+
+        <h2>Thêm Banner</h2>
+        
+        <input type="text" class="ant-input" name="title" placeholder="Tiêu đề" required />
+        <textarea name="description" class="ant-input" placeholder="Mô tả (IN HOA)" rows="3"></textarea>
+        <input type="text" class="ant-input" name="link" placeholder="Liên kết" />
+        <select name="isActive" class="ant-input">
+          <option value="true">Hiển thị</option>
+          <option value="false">Ẩn</option>
+        </select>
+        <input type="file" name="bannerImage" accept="image/*" required class="ant-input" />
+        <div id="bannerPreview" class="image-preview"></div>
+
+        <div class="button-row">
+          <button type="submit" class="btn-custom">Thêm Banner</button>
+          <button type="reset" class="btn-reset">Reset</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="banner-list" class="dashboard-list"></div>
+  </div>
+
+  <!-- LOGO SECTION -->
+  <div id="logo-section" class="tab-content">
+    <div class="form-section">
+      <form id="logo-form" enctype="multipart/form-data">
+        <input type="hidden" name="type" value="logo" />
+
+        <h2>Thêm Logo</h2>
+        <input type="text" class="ant-input" name="title" placeholder="Tên Logo" required />
+        <input type="number" class="ant-input" name="order" min="0" value="0" />
+        <select name="isActive" class="ant-input">
+          <option value="true">Kích hoạt</option>
+          <option value="false">Ẩn</option>
+        </select>
+        <input type="file" name="logoImage" accept="image/*" required class="ant-input" />
+        <div id="logoPreview" class="image-preview"></div>
+
+        <div class="button-row">
+          <button type="submit" class="btn-custom">Thêm Logo</button>
+          <button type="reset" class="btn-reset">Reset</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="logo-list" class="dashboard-list"></div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const tabBanner = document.getElementById("tab-banner");
+  const tabLogo = document.getElementById("tab-logo");
+  const bannerSection = document.getElementById("banner-section");
+  const logoSection = document.getElementById("logo-section");
+
+  tabBanner.onclick = () => switchTab("banner");
+  tabLogo.onclick = () => switchTab("logo");
+
+  function switchTab(type) {
+    document.querySelectorAll(".tab, .tab-content").forEach(el => el.classList.remove("active"));
+    if (type === "banner") {
+      tabBanner.classList.add("active");
+      bannerSection.classList.add("active");
+    } else {
+      tabLogo.classList.add("active");
+      logoSection.classList.add("active");
+    }
+  }
+
+  // === PREVIEW ẢNH ===
+  function handlePreview(input, previewEl) {
+    input.addEventListener("change", () => {
+      previewEl.innerHTML = "";
+      const file = input.files[0];
+      if (file) {
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(file);
+        img.classList.add("preview-img");
+        previewEl.appendChild(img);
+      }
+    });
+  }
+
+  handlePreview(document.querySelector("input[name='bannerImage']"), document.getElementById("bannerPreview"));
+  handlePreview(document.querySelector("input[name='logoImage']"), document.getElementById("logoPreview"));
+
+  // === LOAD MEDIA ===
+  const bannerList = document.getElementById("banner-list");
+  const logoList = document.getElementById("logo-list");
+
+  async function loadMedia(type) {
+    const res = await fetch(`/api/banner?type=${type}`);
+    const data = await res.json();
+    const target = type === "banner" ? bannerList : logoList;
+
+    if (!data.length) {
+      target.innerHTML = `<p class="empty">Chưa có ${type === "banner" ? "banner" : "logo"} nào.</p>`;
+      return;
+    }
+
+    target.innerHTML = data
+      .map(m => `
+        <div class="item-card">
+          <img src="${m.image}" class="list-thumb" />
+          <div class="list-info">
+            <h3>${m.title || "(Không có tiêu đề)"}</h3>
+            ${m.description ? `<p>${m.description}</p>` : ""}
+            <p>Trạng thái: 
+              <span class="${m.isActive ? "status-active" : "status-inactive"}">
+                ${m.isActive ? "Hiển thị" : "Ẩn"}
+              </span>
+            </p>
+          </div>
+          <div class="list-actions">
+            <button class="btn-delete" onclick="deleteMedia('${m._id}', '${type}')">Xóa</button>
+          </div>
+        </div>
+      `).join("");
+  }
+
+  // === TẠO MỚI ===
+  const bannerForm = document.getElementById("banner-form");
+  const logoForm = document.getElementById("logo-form");
+
+  bannerForm.onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(bannerForm);
+    const res = await fetch("/api/banner", { method: "POST", body: fd });
+    if (res.ok) {
+      alert("Đã thêm banner!");
+      bannerForm.reset();
+      document.getElementById("bannerPreview").innerHTML = "";
+      loadMedia("banner");
+    } else {
+      alert("Lỗi thêm banner!");
+    }
+  };
+
+  logoForm.onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(logoForm);
+    const res = await fetch("/api/banner", { method: "POST", body: fd });
+    if (res.ok) {
+      alert("Đã thêm logo!");
+      logoForm.reset();
+      document.getElementById("logoPreview").innerHTML = "";
+      loadMedia("logo");
+    } else {
+      alert("Lỗi thêm logo!");
+    }
+  };
+
+  // === XÓA ===
+  window.deleteMedia = async (id, type) => {
+    if (!confirm("Bạn có chắc muốn xóa không?")) return;
+    await fetch(`/api/banner/${id}`, { method: "DELETE" });
+    loadMedia(type);
+  };
+
+  // === KHỞI TẠO ===
+  loadMedia("banner");
+  loadMedia("logo");
+});
+</script>
