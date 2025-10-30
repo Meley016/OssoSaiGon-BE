@@ -49,8 +49,9 @@ app.use(cookieParser());
 // === SỬA 2: THÊM URL RENDER VÀO ALLOWED ORIGINS (ĐỂ EJS GỌI API) ===
 const allowedOrigins = [
   "http://localhost:5173",
+  "https://ossosaigon-user.vercel.app",
   "http://localhost:3000",
-  "https://your-app.onrender.com", // THÊM URL RENDER (sẽ thay sau)
+  "https://ossosaigon-admin.onrender.com", // THÊM URL RENDER (sẽ thay sau)
 ];
 
 // === CORS: CHO PHÉP GỬI COOKIE + SESSION ===
