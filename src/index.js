@@ -32,6 +32,8 @@ const dashboardController = require("./controllers/dashboardController");
 connectDB();
 
 const app = express();
+
+// === SỬA 1: LẤY PORT TỪ ENV HOẶC DÙNG 3000 (Render yêu cầu) ===
 const PORT = process.env.PORT || 3000;
 
 // === SETUP VIEW ENGINE ===
@@ -44,55 +46,46 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use(cookieParser());
 
+// === SỬA 2: THÊM URL RENDER VÀO ALLOWED ORIGINS (ĐỂ EJS GỌI API) ===
 const allowedOrigins = [
-  "http://localhost:5173", // FE React dev
-  "https://your-production-domain.com",
-  "http://localhost:3000" // FE khi deploy
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://your-app.onrender.com", // THÊM URL RENDER (sẽ thay sau)
 ];
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-};
-
+// === CORS: CHO PHÉP GỬI COOKIE + SESSION ===
 app.use(
   cors({
     origin: function (origin, callback) {
-      // cho phép Postman hoặc server nội bộ (không có origin)
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
       }
     },
-    credentials: true, // ✅ Cho phép gửi cookie qua FE
+    credentials: true, // BẮT BUỘC ĐỂ GỬI COOKIE/SESSION
   })
 );
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// === SESSION: only for Admin Panel Views ===
+// === SESSION: DÙNG CHO ADMIN PANEL ===
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "supersecret_123456",
+    secret: process.env.SESSION_SECRET || "fallback_secret_2025",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production", // HTTPS trên Render
       maxAge: 24 * 60 * 60 * 1000,
+      sameSite: "lax", // Đảm bảo cookie gửi khi gọi API cùng domain
     },
   })
 );
 
-
-// ✅ ADMIN SESSION AUTH FOR EJS
+// === ADMIN MIDDLEWARE ===
 const requireAdmin = (req, res, next) => {
   if (!req.session.admin) {
     return res.redirect("/admin/login");
@@ -100,7 +93,9 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-app.use("/api", cors(corsOptions));
+// === SỬA 3: XÓA DÒNG NÀY (TRÙNG LẶP CORS) ===
+// app.use("/api", cors(corsOptions)); // XÓA DÒNG NÀY
+
 // === API ROUTES ===
 app.use("/api/auth", authRoutes);
 app.use("/api/cart", cartRoutes);
@@ -116,12 +111,10 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/statistics", statisticsRoutes);
 app.use("/api/blogs", blogRoutes);
-app.use("/api/banners", bannerRoutes);
+app.use("/api/banners", bannerRoutes); // ĐÃ SỬA: "banners" không phải "banner"
 
-// === ADMIN AUTH & VIEW ROUTES ===
+// === ADMIN ROUTES ===
 app.use("/admin", authRoutes);
-
-// ✅ Admin Dashboard Render
 app.get("/admin/dashboard/:section", requireAdmin, dashboardController.renderSection);
 
 // === FILE TEMPLATE DOWNLOAD ===
@@ -133,14 +126,14 @@ app.get("/templates/:file", (req, res) => {
     : res.status(404).send("Không tìm thấy file!");
 });
 
-// === ROOT ===
+// === ROOT REDIRECT ===
 app.get("/", (req, res) => {
   req.session.admin
     ? res.redirect("/admin/dashboard/product")
     : res.redirect("/admin/login");
 });
 
-// === 404 ===
+// === 404 HANDLER ===
 app.use((req, res) => {
   const isHTML = req.headers.accept?.includes("text/html");
   if (isHTML) return res.render("admin/404", { title: "404" });
@@ -154,8 +147,11 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || "Server Error!" });
 });
 
-// === START SERVER ===
-const server = app.listen(process.env.PORT || 3000, "0.0.0.0", () => {
+// === SỬA 4: ĐÚNG CÚ PHÁP app.listen() + BIND 0.0.0.0 ===
+const server = app.listen(PORT, "0.0.0.0", () => {
   const port = server.address().port;
-  console.log(`Server chạy tại http://localhost:${port}`);
+  console.log(`Server đang chạy tại: http://localhost:${port}`);
+  console.log(`Production URL: https://ossosaigon-admin.onrender.com`);
 });
+
+module.exports = app;
