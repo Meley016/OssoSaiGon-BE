@@ -1,92 +1,740 @@
-<!-- src/views/partials/order.ejs -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
 <link rel="stylesheet" href="/css/globe.css" />
 
-<div class="order-container">
-  <h2 style="margin-bottom: 1rem;">Quản lý Đơn hàng</h2>
+<style>
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+  }
+  .modal-content {
+    background: white;
+    margin: 5% auto;
+    padding: 20px;
+    border-radius: 4px;
+    max-width: 900px;
+    width: 90%;
+  }
+  .close {
+    float: right;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  #productModal {
+    z-index: 1100; /* Đảm bảo productModal luôn trên editOrderModal */
+  }
+</style>
 
-  <div class="filter-section">
-    <form id="filter-form">
+<div class="order-container">
+  <h2 style="margin-bottom: 20px; color: #ee4d2d;">Quản lý Đơn hàng</h2>
+
+  <div id="notification" class="notification" style="display:none;"></div>
+
+  <div class="form-section">
+    <form id="order-form">
+      <input type="hidden" name="_id" />
+
       <div class="form-grid">
-        <input type="text" name="orderId" placeholder="Mã đơn" class="ant-input" />
-        <input type="text" name="customer" placeholder="Khách hàng" class="ant-input" />
-        <select name="status" class="ant-input">
-          <option value="">--Trạng thái--</option>
-          <option value="pending">Chờ xử lý</option>
-          <option value="processing">Đang xử lý</option>
-          <option value="shipped">Đã giao</option>
-          <option value="cancelled">Hủy</option>
-        </select>
-        <input type="date" name="from" class="ant-input" />
-        <input type="date" name="to" class="ant-input" />
+        <div class="ant-form-item">
+          <label>Khách hàng</label>
+          <select name="userId" id="userSelect" class="ant-input" required>
+            <option value="">--Chọn khách hàng--</option>
+          </select>
+        </div>
+
+        <div class="ant-form-item">
+          <label>Mã khuyến mãi</label>
+          <select name="promotionId" id="promotionSelect" class="ant-input">
+            <option value="">Không áp dụng</option>
+          </select>
+        </div>
+
+        <div class="ant-form-item">
+          <label>Thanh toán</label>
+          <select name="paymentMethod" id="paymentMethod" class="ant-input" required>
+            <option value="cash">Tiền mặt</option>
+            <option value="bank_transfer">Chuyển khoản</option>
+            <option value="credit_card">Thẻ tín dụng</option>
+            <option value="vnpay">VNPAY</option> <!-- Thêm tùy chọn VNPAY -->
+          </select>
+        </div>
+
+        <div class="ant-form-item">
+          <label>Địa chỉ giao hàng</label>
+          <textarea name="shippingAddress" id="shippingAddress" class="ant-input" rows="2" required></textarea>
+        </div>
       </div>
-      <div style="margin-top: 16px;">
-        <button type="submit" class="btn-custom">Lọc</button>
-        <button type="reset" class="btn-custom" style="background: #f5f5f5; border: 1px solid #ddd; margin-left: 8px;">Xóa lọc</button>
+
+      <div class="ant-form-item">
+        <label>Sản phẩm</label>
+        <button type="button" class="btn-custom" onclick="showProductModal()">Chọn sản phẩm</button>
+        <div id="cartSummary" style="margin-top:8px;">Chưa chọn sản phẩm</div>
+      </div>
+
+      <div class="button-row">
+        <button type="submit" class="btn-custom submit-btn">Tạo đơn</button>
+        <button type="reset" onclick="resetForm()" class="btn-reset">Reset</button>
       </div>
     </form>
   </div>
 
-  <table class="table" id="orderTable">
-    <thead>
-      <tr>
-        <th>Mã đơn</th>
-        <th>Khách hàng</th>
-        <th>Sản phẩm</th>
-        <th>Tổng tiền</th>
-        <th>Trạng thái</th>
-        <th>Ngày đặt</th>
-        <th>Hành động</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <!-- Modal chọn sản phẩm -->
+  <div id="productModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:900px;">
+      <span class="close" onclick="closeProductModal()" style="cursor:pointer;">&times;</span>
+      <h3>Chọn biến thể sản phẩm</h3>
+
+      <input id="productSearch" class="ant-input" placeholder="Tìm sản phẩm" style="margin-bottom:12px;" />
+
+      <div id="productList" class="product-list" style="max-height:60vh; overflow:auto;"></div>
+
+      <div class="modal-actions" style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn-reset" onclick="closeProductModal()">Đóng</button>
+        <button class="btn-custom" onclick="confirmProductModal()">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal chỉnh sửa đơn hàng -->
+  <div id="editOrderModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:900px;">
+      <span class="close" onclick="closeEditOrderModal()" style="cursor:pointer;">&times;</span>
+      <h3>Chỉnh sửa đơn hàng</h3>
+
+      <form id="edit-order-form">
+        <input type="hidden" name="_id" />
+
+        <div class="form-grid">
+          <div class="ant-form-item">
+            <label>Khách hàng</label>
+            <select name="userId" id="editUserSelect" class="ant-input">
+              <option value="">--Chọn khách hàng--</option>
+            </select>
+          </div>
+
+          <div class="ant-form-item">
+            <label>Mã khuyến mãi</label>
+            <select name="promotionId" id="editPromotionSelect" class="ant-input">
+              <option value="">Không áp dụng</option>
+            </select>
+          </div>
+
+          <div class="ant-form-item">
+            <label>Thanh toán</label>
+            <select name="paymentMethod" id="editPaymentMethod" class="ant-input">
+              <option value="cash">Tiền mặt</option>
+              <option value="bank_transfer">Chuyển khoản</option>
+              <option value="credit_card">Thẻ tín dụng</option>
+              <option value="vnpay">VNPAY</option> <!-- Thêm tùy chọn VNPAY -->
+            </select>
+          </div>
+
+          <div class="ant-form-item">
+            <label>Địa chỉ giao hàng</label>
+            <textarea name="shippingAddress" id="editShippingAddress" class="ant-input" rows="2"></textarea>
+          </div>
+        </div>
+
+        <div class="ant-form-item">
+          <label>Sản phẩm</label>
+          <button type="button" class="btn-custom" onclick="showProductModal(true)">Chọn sản phẩm</button>
+          <div id="editCartSummary" style="margin-top:8px;">Chưa chọn sản phẩm</div>
+        </div>
+
+        <div class="modal-actions" style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
+          <button type="button" class="btn-reset" onclick="closeEditOrderModal()">Hủy</button>
+          <button type="submit" class="btn-custom">Lưu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bộ lọc và tìm kiếm -->
+  <div class="filter-section" style="margin-top:20px; display:flex; gap:12px; align-items:center;">
+    <input id="searchInput" class="ant-input" placeholder="Tìm mã đơn hoặc khách hàng" style="width:300px;" />
+    <select id="statusFilter" class="ant-input" style="width:200px;">
+      <option value="">Tất cả trạng thái</option>
+      <option value="pending">Chờ xử lý</option>
+      <option value="processing">Đang xử lý</option>
+      <option value="shipped">Đã giao</option>
+      <option value="completed">Hoàn thành</option>
+      <option value="cancelled">Đã hủy</option>
+      <option value="expired">Hết hạn</option>
+    </select>
+    <button class="btn-custom" onclick="applyFilter()">Lọc</button>
+  </div>
+
+  <div class="promotion-table">
+    <table class="ant-table" style="width:100%; margin-top:20px;">
+      <thead>
+        <tr>
+          <th style="cursor:pointer;" onclick="sortOrders('orderCode')">Mã đơn</th>
+          <th style="cursor:pointer;" onclick="sortOrders('userName')">Khách <span id="userNameSortArrow"></span></th>
+          <th style="cursor:pointer;" onclick="sortOrders('total')">Tổng <span id="totalSortArrow"></span></th>
+          <th>Khuyến mãi</th>
+          <th>Trạng thái</th>
+          <th>Ngày tạo</th>
+          <th>Hành động</th>
+        </tr>
+      </thead>
+      <tbody id="orderGrid"></tbody>
+    </table>
+  </div>
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-  const tbody = document.querySelector("#orderTable tbody");
+let productsRes = [];
+let usersRes = [];
+let promotionsRes = [];
+let ordersRes = [];
+let cartItems = [];
+let filteredOrders = [];
+let sortField = null;
+let sortDirection = 1; // 1: asc, -1: desc
+let isEditing = false;
 
-  async function loadOrders(filters = {}) {
-    const params = new URLSearchParams(filters);
-    try {
-      const res = await fetch(`/api/orders?${params}`);
-      const orders = await res.json();
-      tbody.innerHTML = orders.map(o => `
-        <tr>
-          <td>#${o.orderId}</td>
-          <td>${o.customerName}<br><small>${o.customerEmail}</small></td>
-          <td>${o.items.map(i => `${i.name} × ${i.quantity}`).join('<br>')}</td>
-          <td>${o.total.toLocaleString()} VNĐ</td>
-          <td><span class="status status-${o.status}">${getStatusText(o.status)}</span></td>
-          <td>${new Date(o.createdAt).toLocaleDateString('vi-VN')}</td>
-          <td>
-            <button class="btn-custom" style="font-size: 12px; padding: 4px 8px;" onclick="viewOrder('${o._id}')">Xem</button>
-          </td>
-        </tr>
-      `).join("") || "<tr><td colspan='7' style='text-align: center;'>Chưa có đơn hàng</td></tr>";
-    } catch (err) {
-      tbody.innerHTML = `<tr><td colspan='7' style='color: red;'>Lỗi tải đơn hàng</td></tr>`;
+const form = document.getElementById("order-form");
+const editForm = document.getElementById("edit-order-form");
+const productModal = document.getElementById("productModal");
+const editOrderModal = document.getElementById("editOrderModal");
+const cartSummary = document.getElementById("cartSummary");
+const editCartSummary = document.getElementById("editCartSummary");
+const notification = document.getElementById("notification");
+const productList = document.getElementById("productList");
+const productSearch = document.getElementById("productSearch");
+const searchInput = document.getElementById("searchInput");
+const statusFilter = document.getElementById("statusFilter");
+
+function showNotification(msg, type = "error") {
+  notification.textContent = msg;
+  notification.className = "notification " + type;
+  notification.style.display = "block";
+  setTimeout(() => (notification.style.display = "none"), 2500);
+}
+
+// Kiểm tra query params để hiển thị thông báo sau khi quay lại từ VNPAY
+function checkVNPayResult() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const success = urlParams.get("success");
+  const orderCode = urlParams.get("orderCode");
+  const errorCode = urlParams.get("errorCode");
+
+  if (success === "true" && orderCode) {
+    showNotification(`Thanh toán đơn hàng ${orderCode} thành công!`, "success");
+  } else if (success === "false" && errorCode) {
+    showNotification(`Thanh toán thất bại (Mã lỗi: ${errorCode})`, "error");
+  }
+}
+
+async function loadData() {
+  try {
+    const pRes = await fetch("/api/products?page=1&limit=200", { credentials: "include" });
+    const pJson = await pRes.json();
+    productsRes = pJson.data || [];
+
+    usersRes = await fetch("/api/users", { credentials: "include" }).then(r => r.json());
+    promotionsRes = await fetch("/api/promotions", { credentials: "include" }).then(r => r.json());
+    ordersRes = await fetch("/api/orders", { credentials: "include" }).then(r => r.json());
+
+    // Normalize ids to string
+    productsRes = productsRes.map(p => ({
+      ...p,
+      _id: String(p._id),
+      variants: (p.variants || []).map(v => ({ ...v, _id: String(v._id), sku: String(v.sku) }))
+    }));
+    usersRes = usersRes.map(u => ({ ...u, _id: String(u._id) }));
+    promotionsRes = promotionsRes.map(x => ({ ...x, _id: String(x._id) }));
+    ordersRes = ordersRes.map(o => ({
+      ...o,
+      _id: String(o._id),
+      userId: o.userId ? { ...o.userId, _id: String(o.userId._id) } : null,
+      promotionId: o.promotionId ? { ...o.promotionId, _id: String(o.promotionId._id) } : null,
+      items: o.items.map(i => ({
+        ...i,
+        productId: String(i.productId),
+        sku: String(i.sku),
+        quantity: Number(i.quantity),
+        price: Number(i.price)
+      }))
+    }));
+
+    filteredOrders = [...ordersRes];
+    loadOptions();
+    loadOrders();
+    updateCartSummary();
+    checkVNPayResult(); // Kiểm tra kết quả VNPAY khi load trang
+  } catch (err) {
+    console.error("loadData error", err);
+    showNotification("Lỗi tải dữ liệu");
+  }
+}
+
+function loadOptions(isEdit = false) {
+  const userSelect = isEdit ? document.getElementById("editUserSelect") : document.getElementById("userSelect");
+  userSelect.innerHTML =
+    '<option value="">--Chọn khách hàng--</option>' +
+    usersRes.map(u => `<option value="${u._id}">${u.name || "Unknown"}</option>`).join("");
+
+  const promotionSelect = isEdit ? document.getElementById("editPromotionSelect") : document.getElementById("promotionSelect");
+  promotionSelect.innerHTML =
+    '<option value="">Không áp dụng</option>' +
+    promotionsRes.filter(p => p.isActive).map(p => `<option value="${p._id}">${p.code}</option>`).join("");
+}
+
+function showProductModal(isEditMode = false) {
+  isEditing = isEditMode;
+  if (isEditMode) {
+    editOrderModal.style.display = "none"; // Ẩn editOrderModal khi mở productModal
+  }
+  productModal.style.display = "block";
+  renderProductList(productsRes);
+  productSearch.value = "";
+  productSearch.oninput = () => {
+    const q = productSearch.value.trim().toLowerCase();
+    const filtered = productsRes.filter(p => (p.name || "").toLowerCase().includes(q));
+    renderProductList(filtered);
+  };
+}
+
+function renderProductList(data) {
+  if (!data || data.length === 0) {
+    productList.innerHTML = '<div style="padding:20px;text-align:center">Không có sản phẩm.</div>';
+    return;
+  }
+
+  productList.innerHTML = data.map(p => {
+    const pid = String(p._id);
+    const sel = cartItems.find(ci => String(ci.productId) === pid);
+
+    const variantOptions = (p.variants || []).map(v => {
+      const sku = String(v.sku);
+      const disabled = Number(v.stockQuantity) <= 0 ? 'disabled' : '';
+      const selectedAttr = sel && String(sel.sku) === sku ? 'selected' : '';
+      const price = Number(v.price || 0);
+      const label = `${v.sku} - ${v.color?.name || ''}/${v.size?.name || ''} - ${price.toLocaleString("vi-VN")}đ (Còn: ${v.stockQuantity})`;
+      return `<option value="${sku}" ${disabled} ${selectedAttr} data-price="${price}" data-product-id="${pid}">${label}</option>`;
+    }).join("");
+
+    const qtyVal = sel ? sel.quantity : 1;
+    const pricePreview = sel ? `${(sel.price || 0).toLocaleString("vi-VN")}đ / 1sp` : '';
+
+    return `
+      <div class="product-item" style="padding:10px;border-bottom:1px solid #eee;">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div style="flex:1;min-width:180px;">
+            <strong>${p.name}</strong>
+            <div style="font-size:12px;color:#666;margin-top:4px;">${p.brand || ''}</div>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select class="variant-select" onchange="onSelectVariant('${pid}', this)" style="min-width:320px;">
+              <option value="">Chọn biến thể</option>
+              ${variantOptions}
+            </select>
+
+            <input type="number" class="variant-qty" min="1" value="${qtyVal}"
+              style="width:80px" ${sel ? '' : 'disabled'}
+              onchange="onChangeQty('${pid}', this)" />
+          </div>
+        </div>
+
+        <div class="price-preview" style="margin-top:6px;color:#333;font-size:13px;">
+          ${pricePreview}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function onSelectVariant(productId, selectEl) {
+  const sku = selectEl.value;
+  const root = selectEl.closest('.product-item');
+  const qtyInput = root.querySelector('.variant-qty');
+  const pricePreview = root.querySelector('.price-preview');
+  const productIdFromData = selectEl.options[selectEl.selectedIndex]?.dataset.productId;
+
+  const product = productsRes.find(p => String(p._id) === String(productIdFromData || productId));
+  if (!product) {
+    console.warn("product not found", productId);
+    return;
+  }
+
+  if (!sku) {
+    cartItems = cartItems.filter(ci => String(ci.productId) !== String(productId));
+    qtyInput.disabled = true;
+    pricePreview.textContent = '';
+    updateCartSummary();
+    return;
+  }
+
+  const variant = (product.variants || []).find(v => String(v.sku) === String(sku));
+  if (!variant) {
+    showNotification("SKU không hợp lệ");
+    return;
+  }
+
+  qtyInput.disabled = false;
+  qtyInput.max = variant.stockQuantity || 9999;
+
+  const idx = cartItems.findIndex(ci => String(ci.productId) === String(productIdFromData || productId));
+  if (idx >= 0) {
+    cartItems[idx].sku = sku;
+    cartItems[idx].price = Number(variant.price || 0);
+    cartItems[idx].quantity = Math.min(Number(cartItems[idx].quantity) || 1, variant.stockQuantity || 9999);
+  } else {
+    cartItems.push({
+      productId: String(productIdFromData || productId),
+      sku: String(sku),
+      quantity: 1,
+      price: Number(variant.price || 0)
+    });
+  }
+
+  pricePreview.textContent = `${Number(variant.price || 0).toLocaleString("vi-VN")}đ / 1sp`;
+  updateCartSummary();
+}
+
+function onChangeQty(productId, inputEl) {
+  const val = Math.max(1, Number(inputEl.value) || 1);
+  inputEl.value = val;
+  const ci = cartItems.find(c => String(c.productId) === String(productId));
+  if (ci) {
+    const product = productsRes.find(p => String(p._id) === String(productId));
+    if (product && ci.sku) {
+      const variant = (product.variants || []).find(v => String(v.sku) === String(ci.sku));
+      if (variant) {
+        const max = Number(variant.stockQuantity || 9999);
+        ci.quantity = Math.min(val, max);
+        inputEl.value = ci.quantity;
+      } else {
+        ci.quantity = val;
+      }
+    } else {
+      ci.quantity = val;
+    }
+    updateCartSummary();
+  }
+}
+
+function updateCartSummary() {
+  const summaryEl = isEditing ? editCartSummary : cartSummary;
+  if (!cartItems.length) {
+    summaryEl.innerHTML = "Chưa chọn sản phẩm";
+    return;
+  }
+  let subtotal = 0;
+  const rows = cartItems.map(ci => {
+    const p = productsRes.find(pp => String(pp._id) === String(ci.productId));
+    const name = p ? p.name : "Unknown";
+    const itemTotal = (ci.price || 0) * (ci.quantity || 0);
+    subtotal += itemTotal;
+    return `${name} — ${ci.quantity} × ${(ci.price || 0).toLocaleString("vi-VN")}đ = ${itemTotal.toLocaleString("vi-VN")}đ`;
+  });
+  summaryEl.innerHTML = rows.join("<br>") + `<br><strong>Tạm tính: ${subtotal.toLocaleString("vi-VN")}đ</strong>`;
+}
+
+function closeProductModal() {
+  productModal.style.display = "none";
+  if (isEditing) {
+    editOrderModal.style.display = "block"; // Hiển thị lại editOrderModal
+  }
+  updateCartSummary();
+}
+
+function confirmProductModal() {
+  if (!cartItems.length) {
+    showNotification("Chọn ít nhất 1 sản phẩm!");
+    return;
+  }
+  for (const ci of cartItems) {
+    if (!ci.sku) {
+      showNotification("Vẫn có sản phẩm chưa chọn biến thể");
+      return;
     }
   }
+  closeProductModal();
+}
 
-  function getStatusText(status) {
-    const map = { pending: "Chờ xử lý", processing: "Đang xử lý", shipped: "Đã giao", cancelled: "Hủy" };
-    return map[status] || status;
+function closeEditOrderModal() {
+  editOrderModal.style.display = "none";
+  isEditing = false;
+  cartItems = [];
+  updateCartSummary();
+}
+
+function loadOrders() {
+  const tbody = document.getElementById("orderGrid");
+  tbody.innerHTML = filteredOrders.map(o => {
+    const userName = o.userId?.name || "Unknown";
+    const promoCode = o.promotionId?.code || "N/A";
+    const date = new Date(o.createdAt).toLocaleDateString("vi-VN");
+    return `
+      <tr>
+        <td>${o.orderCode}</td>
+        <td>${userName}</td>
+        <td>${(o.total || 0).toLocaleString("vi-VN")}đ</td>
+        <td>${promoCode}</td>
+        <td>
+          <select onchange="updateOrderStatus('${o._id}', this.value)" class="ant-input">
+            <option value="pending" ${o.status === "pending" ? "selected" : ""}>Chờ xử lý</option>
+            <option value="processing" ${o.status === "processing" ? "selected" : ""}>Đang xử lý</option>
+            <option value="shipped" ${o.status === "shipped" ? "selected" : ""}>Đã giao</option>
+            <option value="completed" ${o.status === "completed" ? "selected" : ""}>Hoàn thành</option>
+            <option value="cancelled" ${o.status === "cancelled" ? "selected" : ""}>Đã hủy</option>
+            <option value="expired" ${o.status === "expired" ? "selected" : ""}>Hết hạn</option>
+          </select>
+        </td>
+        <td>${date}</td>
+        <td>
+          <button onclick="editOrder('${o._id}')">Sửa</button>
+          <button onclick="cancelOrder('${o._id}')">Hủy</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+async function updateOrderStatus(orderId, status) {
+  try {
+    const res = await fetch(`/api/orders/${orderId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ status })
+    });
+    const json = await res.json();
+    if (res.ok) {
+      showNotification("Cập nhật trạng thái thành công!", "success");
+      await loadData();
+    } else {
+      showNotification(json.error || "Lỗi cập nhật trạng thái");
+    }
+  } catch (err) {
+    showNotification("Lỗi mạng");
+  }
+}
+
+async function editOrder(id) {
+  const order = ordersRes.find(o => String(o._id) === String(id));
+  if (!order) {
+    console.error("Order not found:", id);
+    return showNotification("Không tìm thấy đơn hàng");
   }
 
-  window.viewOrder = (id) => {
-    window.location.href = `/admin/order/${id}`;
-  };
+  console.log("Editing order:", order); // Debug dữ liệu đơn hàng
 
-  document.getElementById("filter-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.target));
-    Object.keys(data).forEach(k => !data[k] && delete data[k]);
-    loadOrders(data);
+  editOrderModal.style.display = "block";
+  const editForm = document.getElementById("edit-order-form");
+  editForm._id.value = String(order._id);
+  document.getElementById("editUserSelect").value = order.userId ? String(order.userId._id) : "";
+  document.getElementById("editPromotionSelect").value = order.promotionId ? String(order.promotionId._id) : "";
+  document.getElementById("editPaymentMethod").value = String(order.paymentMethod || "cash");
+  document.getElementById("editShippingAddress").value = String(order.shippingAddress || "");
+
+  cartItems = order.items.map(i => ({
+    productId: String(i.productId),
+    sku: String(i.sku),
+    quantity: Number(i.quantity),
+    price: Number(i.price)
+  }));
+
+  loadOptions(true);
+  updateCartSummary();
+}
+
+async function cancelOrder(id) {
+  try {
+    const res = await fetch(`/api/orders/${id}`, {
+      method: "DELETE",
+      credentials: "include"
+    });
+    const json = await res.json();
+    if (res.ok) {
+      showNotification("Hủy đơn thành công!", "success");
+      await loadData();
+    } else {
+      showNotification(json.error || "Lỗi hủy đơn");
+    }
+  } catch (err) {
+    showNotification("Lỗi mạng");
+  }
+}
+
+function sortOrders(field) {
+  if (sortField === field) {
+    sortDirection *= -1;
+  } else {
+    sortField = field;
+    sortDirection = 1;
+  }
+
+  filteredOrders.sort((a, b) => {
+    let valA, valB;
+    if (field === "orderCode") {
+      valA = a.orderCode;
+      valB = b.orderCode;
+    } else if (field === "userName") {
+      valA = a.userId?.name?.toLowerCase() || "";
+      valB = b.userId?.name?.toLowerCase() || "";
+    } else if (field === "total") {
+      valA = a.total || 0;
+      valB = b.total || 0;
+    }
+    return valA > valB ? sortDirection : valA < valB ? -sortDirection : 0;
+  });
+
+  document.getElementById("userNameSortArrow").textContent = "";
+  document.getElementById("totalSortArrow").textContent = "";
+  if (field === "userName") {
+    document.getElementById("userNameSortArrow").textContent = sortDirection === 1 ? "↑" : "↓";
+  } else if (field === "total") {
+    document.getElementById("totalSortArrow").textContent = sortDirection === 1 ? "↑" : "↓";
+  }
+
+  loadOrders();
+}
+
+function applyFilter() {
+  const searchText = searchInput.value.trim().toLowerCase();
+  const status = statusFilter.value;
+
+  filteredOrders = ordersRes.filter(o => {
+    const matchesSearch =
+      o.orderCode.toLowerCase().includes(searchText) ||
+      (o.userId?.name || "").toLowerCase().includes(searchText);
+    const matchesStatus = !status || o.status === status;
+    return matchesSearch && matchesStatus;
   });
 
   loadOrders();
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!cartItems.length) {
+    return showNotification("Chưa chọn sản phẩm!");
+  }
+  if (!form.userId.value) {
+    return showNotification("Vui lòng chọn khách hàng!");
+  }
+  if (!form.paymentMethod.value) {
+    return showNotification("Vui lòng chọn phương thức thanh toán!");
+  }
+  if (!form.shippingAddress.value.trim()) {
+    return showNotification("Vui lòng nhập địa chỉ giao hàng!");
+  }
+
+  const payload = {
+    userId: form.userId.value,
+    promotionId: form.promotionId.value || undefined,
+    paymentMethod: form.paymentMethod.value,
+    shippingAddress: form.shippingAddress.value,
+    items: cartItems.map(ci => ({
+      productId: String(ci.productId),
+      sku: String(ci.sku),
+      quantity: Number(ci.quantity),
+      price: Number(ci.price)
+    }))
+  };
+
+  const id = form._id.value;
+  const url = id ? `/api/orders/${id}` : "/api/orders";
+  const method = id ? "PUT" : "POST";
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (res.ok) {
+      if (json.vnpayUrl) {
+        window.location.href = json.vnpayUrl; // Chuyển hướng đến VNPAY
+      } else {
+        showNotification("Tạo đơn hàng thành công!", "success");
+        resetForm();
+        await loadData();
+      }
+    } else {
+      console.error("Order failed", json);
+      showNotification(json.error || json.message || "Lỗi server");
+    }
+  } catch (err) {
+    console.error("Submit error", err);
+    showNotification("Lỗi mạng");
+  }
 });
+
+editForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!cartItems.length) {
+    return showNotification("Chưa chọn sản phẩm!");
+  }
+  if (!editForm.userId.value) {
+    return showNotification("Vui lòng chọn khách hàng!");
+  }
+  if (!editForm.paymentMethod.value) {
+    return showNotification("Vui lòng chọn phương thức thanh toán!");
+  }
+  if (!editForm.shippingAddress.value.trim()) {
+    return showNotification("Vui lòng nhập địa chỉ giao hàng!");
+  }
+
+  const payload = {
+    userId: editForm.userId.value,
+    promotionId: editForm.promotionId.value || undefined,
+    paymentMethod: editForm.paymentMethod.value,
+    shippingAddress: editForm.shippingAddress.value,
+    items: cartItems.map(ci => ({
+      productId: String(ci.productId),
+      sku: String(ci.sku),
+      quantity: Number(ci.quantity),
+      price: Number(ci.price)
+    }))
+  };
+
+  const id = editForm._id.value;
+  const url = `/api/orders/${id}`;
+
+  try {
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (res.ok) {
+      if (json.vnpayUrl) {
+        window.location.href = json.vnpayUrl; // Chuyển hướng đến VNPAY
+      } else {
+        showNotification("Cập nhật đơn hàng thành công!", "success");
+        closeEditOrderModal();
+        await loadData();
+      }
+    } else {
+      console.error("Edit order failed", json);
+      showNotification(json.error || json.message || "Lỗi server");
+    }
+  } catch (err) {
+    console.error("Submit edit error", err);
+    showNotification("Lỗi mạng");
+  }
+});
+
+function resetForm() {
+  form.reset();
+  cartItems = [];
+  updateCartSummary();
+}
+
+loadData();
 </script>

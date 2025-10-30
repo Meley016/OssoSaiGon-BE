@@ -1,0 +1,69 @@
+
+<div class="statistics-container">
+  <h2>📊 Thống kê doanh thu</h2>
+
+  <div id="statsGrid" class="stats-grid">
+    <!-- Cards sẽ được JS render -->
+  </div>
+
+  <canvas id="loyaltyChart" height="120"></canvas>
+</div>
+
+<!-- CDN Ant Design + Chart.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.19.3/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.19.3/dist/antd.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  .statistics-container {
+    padding: 24px;
+    background: #f9f9f9;
+    border-radius: 12px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+
+  .ant-card {
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+</style>
+
+<script>
+  async function loadStatistics() {
+    const res = await fetch("/admin/statistics/data");
+    const data = await res.json();
+
+    const grid = document.getElementById("statsGrid");
+    grid.innerHTML = `
+      <div class="ant-card ant-card-bordered"><div class="ant-card-body"><b>Tổng doanh thu:</b> ${data.totalRevenue.toLocaleString()}₫</div></div>
+      <div class="ant-card ant-card-bordered"><div class="ant-card-body"><b>Doanh thu ròng:</b> ${data.netRevenue.toLocaleString()}₫</div></div>
+      <div class="ant-card ant-card-bordered"><div class="ant-card-body"><b>Đơn hoàn thành:</b> ${data.completedOrders}</div></div>
+      <div class="ant-card ant-card-bordered"><div class="ant-card-body"><b>Đơn hủy:</b> ${data.cancelledOrders}</div></div>
+      <div class="ant-card ant-card-bordered"><div class="ant-card-body"><b>Người dùng:</b> ${data.totalUsers}</div></div>
+      <div class="ant-card ant-card-bordered"><div class="ant-card-body"><b>Lượt dùng KM:</b> ${data.promoUsage}</div></div>
+    `;
+
+    const ctx = document.getElementById("loyaltyChart");
+    new Chart(ctx, {
+      type: "pie",
+      data: {
+        labels: Object.keys(data.loyaltyTiers),
+        datasets: [{
+          data: Object.values(data.loyaltyTiers),
+          backgroundColor: ["#ff7875", "#ffc069", "#95de64", "#69c0ff", "#b37feb"]
+        }]
+      },
+      options: {
+        plugins: { title: { display: true, text: "Phân bố cấp bậc Loyalty" } }
+      }
+    });
+  }
+
+  loadStatistics();
+</script>

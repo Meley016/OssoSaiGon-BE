@@ -38,7 +38,7 @@ exports.createPromotion = async (req, res) => {
   try {
     const data = req.body;
     console.log("Create promotion data:", data);
-
+    delete data._id;
     // Validation - Kiểm tra các trường bắt buộc
     if (!data.code || !data.name || !data.type || !data.value || !data.startDate || !data.endDate || !data.applyType) {
       return res.status(400).json({ error: "Thiếu các trường bắt buộc (code, name, type, value, startDate, endDate, applyType)" });
@@ -50,6 +50,7 @@ exports.createPromotion = async (req, res) => {
     data.minOrderValue = Number(data.minOrderValue || 0);
     data.minQuantity = Number(data.minQuantity || 0);
     data.usageLimit = Number(data.usageLimit || 0);
+    data.usedCount = Number(data.usedCount || 0);
     data.usageLimitPerUser = Number(data.usageLimitPerUser || 0);
     data.usageLimitPerProduct = Number(data.usageLimitPerProduct || 0);
     data.buyQuantity = Number(data.buyQuantity || 0);
@@ -190,8 +191,10 @@ exports.togglePromotion = async (req, res) => {
   try {
     const promotion = await Promotion.findById(req.params.id);
     if (!promotion) return res.status(404).json({ error: "Không tìm thấy khuyến mãi" });
+    console.log(`Before toggle: promotion ${promotion.code}, isActive = ${promotion.isActive}`);
     promotion.isActive = !promotion.isActive;
     await promotion.save();
+    console.log(`After toggle: promotion ${promotion.code}, isActive = ${promotion.isActive}`);
     res.json({ success: true, isActive: promotion.isActive });
   } catch (err) {
     console.error("Toggle promotion error:", err);
@@ -247,7 +250,7 @@ exports.applyPromotion = async (req, res) => {
         if (promotion.productIds.map((p) => p._id.toString()).includes(id)) {
           const usedCount = promotion.productUsedCount.get(id.toString()) || 0;
           if (promotion.usageLimitPerProduct > 0 && usedCount >= promotion.usageLimitPerProduct)
-            return res.json({ valid: false, msg: `Sản phẩm ${id} đã hết lượt sử dụng` });
+            return res.json({ valid: false, msg: `Khuyến mãi ${id} đã hết lượt sử dụng` });
           matched = true;
           break;
         }
@@ -272,7 +275,7 @@ exports.applyPromotion = async (req, res) => {
         if (productIdsInCategories.includes(id)) {
           const usedCount = promotion.productUsedCount.get(id.toString()) || 0;
           if (promotion.usageLimitPerProduct > 0 && usedCount >= promotion.usageLimitPerProduct)
-            return res.json({ valid: false, msg: `Sản phẩm ${id} đã hết lượt sử dụng` });
+            return res.json({ valid: false, msg: `Khuyến mãi ${id} đã hết lượt sử dụng` });
           matched = true;
           break;
         }

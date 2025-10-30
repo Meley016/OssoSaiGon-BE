@@ -26,7 +26,13 @@ exports.createCategory = async (req, res) => {
       return res.status(400).json({ success: false, error: "Tên danh mục đã tồn tại!" });
     }
 
-    const category = new Category({ name, description });
+    let image = null;
+      if (req.files && req.files.length > 0) {
+        const file = req.files.find(f => f.fieldname === "categoryImage");
+      if (file && file.path) image = file.path;
+    }
+
+    const category = new Category({ name, description, image  });
     await category.save();
     
     console.log("✅ CATEGORY CREATED:", category);
@@ -41,7 +47,18 @@ exports.createCategory = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
-
+exports.getCategoryById = async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ success: false, error: "Không tìm thấy danh mục!" });
+    }
+    res.json(category);
+  } catch (error) {
+    console.error("💥 Get category by ID error:", error);
+    res.status(500).json({ success: false, error: "Lỗi lấy danh mục!" });
+  }
+};
 exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
@@ -56,6 +73,16 @@ exports.updateCategory = async (req, res) => {
     if (description !== undefined) category.description = description;
     if (isActive !== undefined) category.isActive = isActive;
     
+    if (req.files && req.files.length > 0) {
+       const file = req.files.find(f => f.fieldname === "categoryImage");
+       if (file && file.path){
+        if (category.image) {
+          const oldId = category.image.split("/").pop().split(".")[0];
+          try { await cloudinary.uploader.destroy(oldId); } catch {}
+        }
+       } category.image = file.path;
+    }
+
     await category.save();
     res.json({ success: true, message: "Cập nhật thành công!", category });
   } catch (error) {

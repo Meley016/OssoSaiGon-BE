@@ -1,0 +1,155 @@
+<link rel="stylesheet" href="/css/globe.css">
+
+<div class="container">
+  
+  <!-- FORM -->
+  <form id="blog-form" class="form-section" enctype="multipart/form-data">
+    <h2 class="section-title">Quản lý Bài viết</h2>
+    <div class="form-grid">
+      <div class="ant-form-item" style="grid-column: span 2;">
+        <label>Tiêu đề <span class="required">*</span></label>
+        <input
+          type="text"
+          name="title"
+          class="ant-input"
+          placeholder="Nhập tiêu đề bài viết"
+          required
+        />
+      </div>
+
+      <div class="ant-form-item" style="grid-column: span 2;">
+        <label>Nội dung <span class="required">*</span></label>
+        <textarea
+          name="content"
+          class="ant-input"
+          rows="5"
+          placeholder="Nhập nội dung bài viết"
+          required
+        ></textarea>
+      </div>
+
+      <div class="ant-form-item" style="grid-column: span 2;">
+        <label>Ảnh minh họa</label>
+        <input
+          type="file"
+          name="blogImages"
+          accept="image/*"
+          multiple
+          class="ant-input"
+        />
+        <small style="color:#888">Chọn 1 hoặc nhiều ảnh. Khi thay ảnh sẽ tự xóa ảnh cũ.</small>
+      </div>
+    </div>
+
+    <div class="button-row" style="justify-content: flex-end; margin-top: 16px;">
+      <button type="reset" class="btn-reset">Đặt lại</button>
+      <button type="submit" class="btn-custom">Đăng bài</button>
+    </div>
+  </form>
+
+  <!-- DANH SÁCH BÀI VIẾT -->
+  <div class="promotion-table" style="margin-top: 24px;">
+    <table class="ant-table" id="blogTable">
+      <thead>
+        <tr>
+          <th style="width: 60px;">#</th>
+          <th>Ảnh</th>
+          <th>Tiêu đề</th>
+          <th>Nội dung</th>
+          <th>Ngày đăng</th>
+          <th style="width: 120px;">Hành động</th>
+        </tr>
+      </thead>
+      <tbody id="blogGrid">
+        <tr><td colspan="6" style="text-align:center;">Đang tải...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const grid = document.getElementById("blogGrid");
+  const form = document.getElementById("blog-form");
+
+  async function loadBlogs() {
+    grid.innerHTML = `<tr><td colspan="6" style="text-align:center;">Đang tải...</td></tr>`;
+    try {
+      const res = await fetch("/api/blogs");
+      const blogs = await res.json();
+
+      if (!blogs.length) {
+        grid.innerHTML = `<tr><td colspan="6" style="text-align:center;">Chưa có bài viết nào.</td></tr>`;
+        return;
+      }
+
+      grid.innerHTML = blogs.map((b, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>
+            ${b.images?.[0]
+              ? `<img src="${b.images[0]}" alt="${b.title}" style="width:70px;height:70px;object-fit:cover;border-radius:4px;">`
+              : `<div class="no-img">Không có</div>`
+            }
+          </td>
+          <td>${b.title}</td>
+          <td>${b.content.length > 60 ? b.content.slice(0, 60) + "..." : b.content}</td>
+          <td>${new Date(b.createdAt).toLocaleDateString()}</td>
+          <td>
+            <button class="btn-edit" onclick="editBlog('${b._id}', '${b.title}', \`${b.content.replace(/`/g, "\\`")}\`)">Sửa</button>
+            <button class="btn-delete" onclick="deleteBlog('${b._id}')">Xóa</button>
+          </td>
+        </tr>
+      `).join("");
+    } catch (err) {
+      console.error(err);
+      grid.innerHTML = `<tr><td colspan="6" style="text-align:center;color:red;">Lỗi tải bài viết.</td></tr>`;
+    }
+  }
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    try {
+      const res = await fetch("/api/blogs", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Lỗi đăng bài");
+      showToast("success", "✅ Đăng bài thành công!");
+      form.reset();
+      loadBlogs();
+    } catch (err) {
+      showToast("error", "❌ " + err.message);
+    }
+  });
+
+  window.deleteBlog = async id => {
+    if (!confirm("Xóa bài viết này?")) return;
+    try {
+      const res = await fetch(`/api/blogs/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Lỗi xóa bài viết");
+      showToast("success", "🗑️ Đã xóa bài viết!");
+      loadBlogs();
+    } catch (err) {
+      showToast("error", "❌ " + err.message);
+    }
+  };
+
+  loadBlogs();
+});
+
+// ✅ Toast thông báo
+function showToast(type, message) {
+  const container = document.querySelector(".toast-container") || (() => {
+    const c = document.createElement("div");
+    c.className = "toast-container";
+    document.body.appendChild(c);
+    return c;
+  })();
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+
+  setTimeout(() => toast.remove(), 3000);
+}
+</script>
