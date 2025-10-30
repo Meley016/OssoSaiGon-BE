@@ -50,7 +50,7 @@ app.use(cookieParser());
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
-  "https://your-app.onrender.com", // THÊM URL RENDER (sẽ thay sau)
+  "https://ossosaigon-admin.onrender.com", // THÊM URL RENDER (sẽ thay sau)
 ];
 
 // === CORS: CHO PHÉP GỬI COOKIE + SESSION ===
