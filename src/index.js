@@ -155,6 +155,7 @@ app.use((err, req, res, next) => {
 });
 
 // === START SERVER ===
-app.listen(PORT, () => {
-  console.log(`✅ Server chạy tại http://localhost:${PORT}`);
+const server = app.listen(process.env.PORT || 3000, "0.0.0.0", () => {
+  const port = server.address().port;
+  console.log(`Server chạy tại http://localhost:${port}`);
 });
