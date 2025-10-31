@@ -36,6 +36,17 @@ const app = express();
 // === SỬA 1: LẤY PORT TỪ ENV HOẶC DÙNG 3000 (Render yêu cầu) ===
 const PORT = process.env.PORT || 3000;
 
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`❌ Blocked by CORS: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+};
 // === SETUP VIEW ENGINE ===
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
