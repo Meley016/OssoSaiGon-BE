@@ -36,6 +36,27 @@ const app = express();
 // === SỬA 1: LẤY PORT TỪ ENV HOẶC DÙNG 3000 (Render yêu cầu) ===
 const PORT = process.env.PORT || 3000;
 
+
+// === SỬA 2: THÊM URL RENDER VÀO ALLOWED ORIGINS (ĐỂ EJS GỌI API) ===
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://ossosaigon-user.vercel.app",
+  "http://localhost:3000",
+  "https://ossosaigon-admin.onrender.com", // THÊM URL RENDER (sẽ thay sau)
+];
+
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`❌ Blocked by CORS: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+};
 // === SETUP VIEW ENGINE ===
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -46,28 +67,6 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use(cookieParser());
 
-// === SỬA 2: THÊM URL RENDER VÀO ALLOWED ORIGINS (ĐỂ EJS GỌI API) ===
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://ossosaigon-user.vercel.app",
-  "http://localhost:3000",
-  "https://ossosaigon-admin.onrender.com", // THÊM URL RENDER (sẽ thay sau)
-];
-
-// === CORS: CHO PHÉP GỬI COOKIE + SESSION ===
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.warn(`❌ Blocked by CORS: ${origin}`);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true, // BẮT BUỘC ĐỂ GỬI COOKIE/SESSION
-  })
-);
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
