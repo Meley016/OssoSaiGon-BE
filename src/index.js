@@ -61,6 +61,7 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn(`❌ Blocked by CORS: ${origin}`);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -68,20 +69,21 @@ app.use(
   })
 );
 
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
+ 
 // === SESSION: DÙNG CHO ADMIN PANEL ===
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "fallback_secret_2025",
+    secret: process.env.SESSION_SECRET || "your-session-secret-key-2025",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // HTTPS trên Render
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",      
       maxAge: 24 * 60 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
   })
 );
@@ -94,8 +96,6 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// === SỬA 3: XÓA DÒNG NÀY (TRÙNG LẶP CORS) ===
-// app.use("/api", cors(corsOptions)); // XÓA DÒNG NÀY
 
 // === API ROUTES ===
 app.use("/api/auth", authRoutes);
@@ -145,7 +145,9 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error("GLOBAL ERROR:", err);
   if (res.headersSent) return next(err);
-  res.status(err.status || 500).json({ error: err.message || "Server Error!" });
+  res
+  .status(err.status || 500)
+  .json({ error: err.message || "Server Error!" });
 });
 
 // === SỬA 4: ĐÚNG CÚ PHÁP app.listen() + BIND 0.0.0.0 ===
