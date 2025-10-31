@@ -81,7 +81,7 @@ app.use(
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // HTTPS trên Render
       maxAge: 24 * 60 * 60 * 1000,
-      sameSite: "lax", // Đảm bảo cookie gửi khi gọi API cùng domain
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
   })
 );
