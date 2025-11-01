@@ -9,6 +9,7 @@ const cartCtrl = require("../controllers/cartController");
 router.get("/", apiProtect, cartCtrl.getCart);
 router.post("/add", apiProtect, cartCtrl.addToCart);
 router.put("/update", apiProtect, cartCtrl.updateCartItem);
+router.delete("/:sku", apiProtect, cartCtrl.removeItem);
 router.delete("/clear", apiProtect, cartCtrl.clearCart);
 
 module.exports = router;

@@ -7,7 +7,7 @@ const cookieParser = require("cookie-parser");
 require("dotenv").config();
 
 const connectDB = require("./config/database");
-
+const MongoStore = require("connect-mongo");
 // === ROUTES ===
 const authRoutes = require("./routes/auth");
 const productRoutes = require("./routes/products");
@@ -65,28 +65,31 @@ app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-app.use(cookieParser());
-
-
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(cookieParser());
  
 // === SESSION: DÙNG CHO ADMIN PANEL ===
-app.use(
+app.set("trust proxy", 1); // ✅ BẮT BUỘC CHO HTTPS (Render)
+
+app.use( 
   session({
     secret: process.env.SESSION_SECRET || "your-session-secret-key-2025",
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      collectionName: "sessions",
+    }),
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // HTTPS trên Render
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",      
-      maxAge: 24 * 60 * 60 * 1000,
+      secure: process.env.NODE_ENV === "production", // ✅ cookie chỉ gửi qua HTTPS
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // ✅ cho phép FE khác domain
+      maxAge: 24 * 60 * 60 * 1000, // 1 ngày
     },
   })
 );
-
 // === ADMIN MIDDLEWARE ===
 const requireAdmin = (req, res, next) => {
   if (!req.session.admin) {
