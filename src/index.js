@@ -71,7 +71,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
  
 // === SESSION: DÙNG CHO ADMIN PANEL ===
-app.set("trust proxy", 1); // ✅ BẮT BUỘC CHO HTTPS (Render)
+// app.set("trust proxy", 1); // ✅ BẮT BUỘC CHO HTTPS (Render)
 
 app.use( 
   session({

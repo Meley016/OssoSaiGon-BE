@@ -205,6 +205,7 @@ exports.togglePromotion = async (req, res) => {
 exports.applyPromotion = async (req, res) => {
   try {
     const { code, userId, orderTotal, productIds, quantities } = req.body;
+    
     const promotion = await Promotion.findOne({ code, isActive: true })
       .populate("productIds", "name coverImage")
       .populate("categoryIds", "name")
