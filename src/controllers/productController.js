@@ -18,15 +18,16 @@ const splitFiles = (files) => {
   if (!Array.isArray(files)) return { variantImages };
 
   files.forEach(file => {
-    const match = file.fieldname.match(/variantImageFile\[(\d+)\]/);
+    // ví dụ fieldname: variantImageFile[68fb5329f6e7e125a9264d6a]
+    const match = file.fieldname.match(/variantImageFile\[(.+?)\]/);
     if (match) {
-      const i = parseInt(match[1]);
-      if (!variantImages[i]) variantImages[i] = [];
-      variantImages[i].push(file);
+      const colorId = match[1];
+      if (!variantImages[colorId]) variantImages[colorId] = [];
+      variantImages[colorId].push(file);
     }
   });
 
-  console.log("🧩 Parsed variantImages keys:", Object.keys(variantImages));
+  console.log("🧩 Parsed variantImages (colorId keys):", Object.keys(variantImages));
   return { variantImages };
 };
 
@@ -360,10 +361,6 @@ exports.getProductById = async (req, res) => {
 // === CREATE PRODUCT ===
 exports.createProduct = async (req, res) => {
   try {
-    console.log("📸 Files received:", req.files?.length || 0);
-    if (Array.isArray(req.files)) {
-      req.files.forEach(f => console.log(" -", f.fieldname, "=>", f.path));
-    }
     const data = req.body;
     const { variantImages } = splitFiles(req.files);
     const variants = JSON.parse(data.variants || "[]");
@@ -372,31 +369,66 @@ exports.createProduct = async (req, res) => {
       return res.status(400).json({ error: "Cần ít nhất 1 biến thể!" });
     }
 
-    const finalVariants = [];
+    // === Base folder Cloudinary (theo tên sản phẩm)
+    const safeName = data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const baseFolder = `osso/products/${safeName}`;
+
+    // === Map lưu ảnh theo màu (upload 1 lần)
+    const colorImageMap = {}; // { colorId: [url1, url2...] }
+
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
-      const imgs = (variantImages[i] || []).map(fileToUrl).filter(Boolean);
+      const files = variantImages[v.color] || [];
 
-      if (!imgs.length)
-        return res.status(400).json({ error: `Biến thể ${i + 1} cần ít nhất 1 ảnh!` });
+      // Nếu màu này chưa upload -> upload lên Cloudinary
+      if (!colorImageMap[v.color] && files.length) {
+        const uploadedUrls = [];
 
+        for (const f of files) {
+          // Nếu đã là URL Cloudinary (multer-storage-cloudinary) -> dùng luôn
+          if (f.path && f.path.startsWith("https://res.cloudinary.com")) {
+            uploadedUrls.push(f.path);
+            continue;
+          }
+
+          // Nếu là file local (chưa upload) -> upload thủ công
+          const uploadRes = await cloudinary.uploader.upload(f.path, {
+            folder: `${baseFolder}/${v.color}`,
+            unique_filename: true,
+            overwrite: false,
+          });
+          uploadedUrls.push(uploadRes.secure_url);
+        }
+
+        colorImageMap[v.color] = [...new Set(uploadedUrls)]; // loại trùng
+      } else if (!files.length && !colorImageMap[v.color]) {
+        return res.status(400).json({ error: `Biến thể ${i + 1} thiếu ảnh!` });
+      }
+    }
+
+    // === Gán ảnh chung cho các variant cùng màu
+    const finalVariants = [];
+    for (const v of variants) {
       const color = await Color.findById(v.color);
       const size = await Size.findById(v.size);
-      if (!color || !size)
-        return res.status(400).json({ error: `Biến thể ${i + 1} màu hoặc size không hợp lệ!` });
+      if (!color || !size) continue;
+
+      const sharedImages = colorImageMap[v.color] || [];
+      if (!sharedImages.length) continue;
 
       finalVariants.push({
         sku: `${data.SKU}-${color.name}-${size.name}`.toUpperCase(),
         color: v.color,
         size: v.size,
-        stockQuantity: Number(v.quantity || 0),
-        price: Number(v.price || 0),
-        importPrice: Number(v.price || 0) * 0.8,
-        images: imgs,
-        coverImage: imgs[0],
+        price: Number(v.price),
+        stockQuantity: Number(v.stock),
+        importPrice: Number(v.price) * 0.8,
+        images: sharedImages,
+        coverImage: sharedImages[0],
       });
     }
 
+    // === Tạo sản phẩm
     const product = await Product.create({
       groupId: data.SKU,
       name: data.name,
@@ -419,111 +451,102 @@ exports.createProduct = async (req, res) => {
   }
 };
 
+
 // === UPDATE PRODUCT ===
 exports.updateProduct = async (req, res) => {
   try {
-    console.log("📸 Files received:", req.files?.length || 0);
-    if (Array.isArray(req.files)) {
-      req.files.forEach(f => console.log(" -", f.fieldname, "=>", f.path));
-    }
     const product = await Product.findById(req.params.id);
-    if (!product) return res.status(404).json({ error: "Không tìm thấy sản phẩm!" });
+    if (!product) return res.status(404).json({ error: "Không tìm thấy!" });
 
-    const { variantImages } = splitFiles(req.files);
     const body = req.body;
+    const { variantImages } = splitFiles(req.files);
 
-    // Xác định danh sách index biến thể từ formData
-    const indexes = [
-      ...new Set(
-        Object.keys(body)
-          .map(k => (/\[(\d+)\]/.test(k) ? parseInt(k.match(/\[(\d+)\]/)[1]) : null))
-          .filter(v => v !== null)
-      ),
-    ];
+    // === 1. Cập nhật biến thể cũ (dựa trên existingVariantId) ===
+    const existingIndexes = Object.keys(body).filter(k => k.startsWith('existingVariantId['));
+    const updatedIds = new Set();
 
-    const updatedVariants = [];
+    for (const key of existingIndexes) {
+      const i = key.match(/\[(\d+)\]/)[1];
+      const variantId = body[`existingVariantId[${i}]`];
+      const variant = product.variants.id(variantId);
+      if (!variant) continue;
 
-    for (const i of indexes) {
-      const color = body[`variantColor[${i}]`];
-      const size = body[`variantSize[${i}]`];
-      const stockQuantity = parseInt(body[`variantStock[${i}]`] || 0);
-      const price = parseInt(body[`variantPrice[${i}]`] || 0);
+      updatedIds.add(variantId);
 
+      // Chỉ cập nhật SL + Giá
+      variant.stockQuantity = parseInt(body[`variantStock[${i}]`] || variant.stockQuantity);
+      variant.price = parseInt(body[`variantPrice[${i}]`] || variant.price);
+      variant.importPrice = variant.price * 0.8;
+
+      // === Thêm ảnh mới (nếu có) ===
+      // const newImgs = (variantImages[i] || []).map(fileToUrl);
+      // if (newImgs.length) {
+      //   const finalImgs = [...new Set([...variant.images, ...newImgs])];
+      //   if (finalImgs.length === 0) return res.status(400).json({ error: "Cần ít nhất 1 ảnh!" });
+      //   variant.images = finalImgs;
+      //   variant.coverImage = finalImgs[0];
+      // }
+    }
+
+    // === 2. Tạo biến thể mới ===
+    const newIndexes = Object.keys(body).filter(k => k.startsWith('newVariantColor['));
+    for (const key of newIndexes) {
+      const i = key.match(/\[(\d+)\]/)[1];
+      const colorId = body[`newVariantColor[${i}]`];
+      const sizeId = body[`newVariantSize[${i}]`];
+      const price = parseInt(body[`newVariantPrice[${i}]`] || 0);
+      const stock = parseInt(body[`newVariantStock[${i}]`] || 0);
+      const imgs = (variantImages[i] || []).map(fileToUrl);
+
+      if (!colorId || !sizeId || !imgs.length || price <= 0) continue;
+
+      const color = await Color.findById(colorId);
+      const size = await Size.findById(sizeId);
       if (!color || !size) continue;
 
-      // ✅ Tìm variant cũ nếu có
-      const existing = product.variants.find(
-        v => v.color.toString() === color && v.size.toString() === size
-      );
-
-      // ✅ Ảnh cũ từ form
-      const existingImages = []
-        .concat(body[`variantExistingImages[${i}][]`] || [])
-        .flat()
-        .filter(Boolean);
-
-      // ✅ Ảnh mới upload
-      const newImages = (variantImages[i] || []).map(fileToUrl).filter(Boolean);
-
-      // ✅ Merge ảnh cũ + mới (không trùng)
-      let finalImages = [...new Set([...(existingImages || []), ...(newImages || [])])];
-
-      if (finalImages.length === 0 && existing?.images?.length) {
-        finalImages = existing.images;
-      }
-
-      if (finalImages.length === 0)
-        return res.status(400).json({ error: `Biến thể ${i + 1} cần ít nhất 1 ảnh!` });
-
-      updatedVariants.push({
-        sku: existing?.sku || `${body.SKU}-${color}-${size}`.toUpperCase(),
-        color,
-        size,
-        stockQuantity,
+      product.variants.push({
+        sku: `${body.SKU || product.groupId}-${color.name}-${size.name}`.toUpperCase(),
+        color: color._id,
+        size: size._id,
         price,
+        stockQuantity: stock,
         importPrice: price * 0.8,
-        images: finalImages,
-        coverImage: finalImages[0],
+        images: imgs,
+        coverImage: imgs[0],
       });
     }
 
-    // ✅ Giữ lại các variant cũ không được gửi trong form
-    const untouchedVariants = product.variants.filter(
-      old =>
-        !updatedVariants.some(
-          v => v.color.toString() === old.color.toString() && v.size.toString() === old.size.toString()
-        )
-    );
+    // === 3. Xóa biến thể không còn trong form ===
+    product.variants = product.variants.filter(v => {
+      if (v._id && !updatedIds.has(v._id.toString())) {
+        v.images.forEach(url => {
+          const pid = extractPublicId(url);
+          if (pid) cloudinary.uploader.destroy(pid).catch(() => {});
+        });
+        return false;
+      }
+      return true;
+    });
 
-    // ✅ Gộp lại
-    product.variants = [...untouchedVariants, ...updatedVariants];
-
-    // ✅ Cập nhật thông tin chung
-    product.SKU = body.SKU || product.SKU;
-    product.name = body.name || product.name;
-    product.brand = body.brand || product.brand;
-    product.category = body.category || product.category;
-    product.description = body.description || product.description;
+    // === 4. Cập nhật chung (nếu có) ===
+    if (body.SKU) product.groupId = body.SKU;
+    if (body.name) product.name = body.name;
+    if (body.brand) product.brand = body.brand;
+    if (body.category) product.category = body.category;
+    if (body.description !== undefined) product.description = body.description;
 
     await product.save();
 
-    const updated = await Product.findById(product._id)
+    const populated = await Product.findById(product._id)
+      .populate("category", "name")
       .populate("variants.color", "name code")
       .populate("variants.size", "name code")
-      .populate("category", "name")
       .lean();
 
-    console.log("✅ Final variants:", updated.variants.map(v => ({
-      sku: v.sku,
-      color: v.color?.name,
-      size: v.size?.name,
-      images: v.images?.length
-    })));
-
-    res.json(updated);
+    res.json(populated);
   } catch (err) {
     console.error("UPDATE ERROR:", err);
-    res.status(500).json({ error: "Lỗi cập nhật sản phẩm", details: err.message });
+    res.status(500).json({ error: "Lỗi cập nhật", details: err.message });
   }
 };
 
@@ -531,35 +554,20 @@ exports.updateProduct = async (req, res) => {
 // === DELETE PRODUCT ===
 exports.deleteProduct = async (req, res) => {
   try {
-    const current = await Product.findById(req.params.id).lean();
-    if (!current) return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: "Không tìm thấy!" });
 
-    // Thu thập tất cả ảnh từ variants
-    const images = current.variants.flatMap(v => v.images || []).filter(Boolean);
-    console.log("Images to delete from Cloudinary:", images); // Debug
+    const safeName = product.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const folder = `osso/products/${safeName}`;
 
-    // Xóa ảnh trên Cloudinary
-    const deletePromises = images.map(url => {
-      const pid = extractPublicId(url);
-      if (pid) {
-        return cloudinary.uploader.destroy(pid).catch(err => {
-          console.error(`Cloudinary delete error for ${pid}:`, err);
-          return null; // Tiếp tục dù lỗi xóa ảnh
-        });
-      }
-      return Promise.resolve(null);
-    });
+    // XÓA TOÀN BỘ THƯ MỤC
+    await cloudinary.api.delete_resources_by_prefix(folder);
+    await cloudinary.api.delete_folder(folder);
 
-    await Promise.all(deletePromises);
-    console.log("Cloudinary deletion completed"); // Debug
-
-    // Xóa sản phẩm khỏi database
     await Product.findByIdAndDelete(req.params.id);
-    console.log(`Product ${req.params.id} deleted from database`); // Debug
-
-    res.json({ success: true, message: "Sản phẩm và ảnh đã được xóa" });
+    res.json({ success: true, message: "Xóa thành công + ảnh" });
   } catch (err) {
     console.error("DELETE ERROR:", err);
-    res.status(500).json({ error: "Xóa thất bại", details: err.message });
+    res.status(500).json({ error: "Lỗi xóa", details: err.message });
   }
 };
