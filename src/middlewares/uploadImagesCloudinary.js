@@ -35,7 +35,7 @@ const fields = [{ name: "avatar", maxCount: 1 }];
 
 // ✅ giữ nguyên variant
 for (let i = 0; i < 20; i++) {
-  fields.push({ name: `variantImageFile[${i}][]`, maxCount: 6 });
+  fields.push({ name: `variantImageFile[${i}]`, maxCount: 6 });
 }
 
 fields.push({ name: "categoryImage", maxCount: 1 });

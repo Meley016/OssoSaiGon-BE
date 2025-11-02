@@ -493,7 +493,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // ✅ ảnh mới - đổi về cùng key như CREATE
       const files = row.querySelector("input[type='file']").files;
       for (const f of files) {
-        formData.append(`variantImageFile[${i}][]`, f); // 💥 fix chỗ này
+        formData.append(`variantImageFile[${i}]`, f);
       }
     });
 
