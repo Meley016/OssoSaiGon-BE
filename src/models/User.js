@@ -60,7 +60,14 @@ const userSchema = new mongoose.Schema(
 
     loyalty: { type: loyaltySchema, default: () => ({}) },
 
-    isBlocked: { type: Boolean, default: false }
+    isBlocked: { type: Boolean, default: false },
+    emailPending: { type: String },
+    emailToken: { type: String },
+    emailTokenExpire: { type: Date },
+
+    passwordPending: { type: String }, // tạm lưu password đã hash
+    passwordToken: { type: String },
+    passwordTokenExpire: { type: Date },
   },
   { timestamps: true }
 );
