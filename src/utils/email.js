@@ -4,9 +4,10 @@ const nodemailer = require("nodemailer");
 // SỬA: DÙNG createTransport() – ĐÚNG CÁCH NODemailer v7+
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
-  port: Number(process.env.EMAIL_PORT),
-  secure: process.env.EMAIL_SECURE === "true", // true cho 465, false cho 587
-  auth: {
+  port: Number(process.env.EMAIL_PORT) || 587,
+  secure: process.env.EMAIL_SECURE === "true", // false cho 587
+  requireTLS: true,
+    auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
