@@ -9,11 +9,10 @@
 <body>
   <!-- Header -->
   <div class="header">
-    <div class="logo">
-        
-          <img src="https://res.cloudinary.com/dnyb9bbkr/image/upload/v1761499434/osso/variants/1761499432471_9bispp02x.jpg" alt="Logo" />
-      <h1>Admin Dashboard</h1>
-    </div>
+        <div class="logo">
+          <img id="adminLogo" src="/images/default-logo.png" alt="Logo" />
+          <h1>Admin Dashboard</h1>
+        </div>
     <form action="/admin/logout" method="POST">
       <button type="submit" class="logout-btn">Đăng xuất</button>
     </form>
@@ -71,6 +70,25 @@
       // Lưu trạng thái vào localStorage
       localStorage.setItem('sidebarHidden', isHidden);
     });
+
+    document.addEventListener("DOMContentLoaded", async () => {
+    try {
+      const res = await fetch("/api/banners/active?type=logo");
+      if (!res.ok) throw new Error("Không thể tải logo!");
+
+      const data = await res.json();
+      const logo = data[0]; // chỉ lấy cái đầu tiên (vì chỉ 1 logo active)
+      const imgEl = document.getElementById("adminLogo");
+
+      if (logo?.image) {
+        imgEl.src = logo.image;
+      } else {
+        imgEl.src = "/images/default-logo.png"; // fallback nếu không có
+      }
+    } catch (err) {
+      console.warn("⚠️ Lỗi tải logo:", err.message);
+    }
+  });
   </script>
 </body>
 </html>

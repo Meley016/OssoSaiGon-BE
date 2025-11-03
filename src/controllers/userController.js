@@ -3,6 +3,13 @@ const { User, LoyaltyConfig, LoyaltyHistory } = require("../models/User");
 const cloudinary = require("../config/cloudinary");
 const bcrypt = require("bcryptjs");
 
+
+// Hàm hỗ trợ: tìm file theo fieldname
+function getUploadedFile(req, fieldname) {
+  if (!req.files || !Array.isArray(req.files)) return null;
+  return req.files.find(f => f.fieldname === fieldname);
+}
+
 function computeTierFromPoints(points, tiers = []) {
   if (!Array.isArray(tiers) || tiers.length === 0) return { tier: null };
   const sorted = [...tiers].sort((a, b) => b.minPoints - a.minPoints);
@@ -43,13 +50,12 @@ exports.getUser = async (req, res) => {
   }
 };
 
-// CREATE USER
+// CREATE USER - CHỈ SỬA PHẦN ẢNH
 exports.createUser = async (req, res) => {
   try {
-    let avatar = req.body.avatar;
-    if (req.files?.avatar?.length) {
-      avatar = req.files.avatar[0].path;
-    }
+    // BẮT CHƯỚC BANNER: tìm file theo fieldname
+    const file = req.files?.find(f => f.fieldname === "avatar");
+    const avatar = file?.path || null; // .path từ CloudinaryStorage
 
     const { email, password, name, role, address, birthday } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Thiếu email hoặc mật khẩu" });
@@ -57,17 +63,22 @@ exports.createUser = async (req, res) => {
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ error: "Email đã tồn tại" });
 
-    const user = await User.create({
+    const user = new User({
       email,
       password,
-      name,
+      name: name || "",
       role: role || "user",
-      address,
-      birthday,
-      avatar,
-      loyalty: { points: Number(req.body.loyaltyPoints || 0), tier: req.body.loyaltyTier || null },
+      address: address || "",
+      birthday: birthday || null,
+      avatar, // ← DÙNG .path
+      loyalty: { 
+        points: Number(req.body.loyaltyPoints || 0), 
+        tier: req.body.loyaltyTier || null 
+      },
       isBlocked: req.body.isBlocked === "true"
     });
+
+    await user.save();
 
     const safe = user.toObject();
     delete safe.password;
@@ -78,7 +89,7 @@ exports.createUser = async (req, res) => {
   }
 };
 
-// UPDATE user
+// UPDATE USER - CHỈ SỬA PHẦN ẢNH
 exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -86,21 +97,40 @@ exports.updateUser = async (req, res) => {
     if (!user) return res.status(404).json({ error: "Không tìm thấy user" });
 
     let avatar = user.avatar;
-    if (req.files?.avatar?.length) {
-      await deleteCloudinaryImage(user.avatar);
-      avatar = req.files.avatar[0].path;
+
+    // BẮT CHƯỚC BANNER: tìm file theo fieldname
+    const file = req.files?.find(f => f.fieldname === "avatar");
+
+    if (file) {
+      // Xóa ảnh cũ nếu có
+      if (user.avatar) await deleteCloudinaryImage(user.avatar);
+      avatar = file.path; // ← DÙNG .path
+    }
+    // Giữ nguyên nếu có avatarKeep
+    else if (req.body.avatarKeep === "true") {
+      // không đổi
+    }
+    // Xóa avatar nếu frontend gửi rỗng
+    else if (req.body.avatar === "" || req.body.avatar === null) {
+      if (user.avatar) await deleteCloudinaryImage(user.avatar);
+      avatar = null;
     }
 
-    Object.assign(user, req.body, {
-      avatar,
-      loyalty: {
-        points: Number(req.body.loyaltyPoints) || 0,
-        tier: req.body.loyaltyTier || user.loyalty.tier
-      },
-      isBlocked: req.body.isBlocked === "true"
-    });
+    // CẬP NHẬT CÁC TRƯỜNG KHÁC (không động vào password)
+    user.name = req.body.name || user.name;
+    user.email = req.body.email || user.email;
+    user.address = req.body.address ?? user.address;
+    user.birthday = req.body.birthday || user.birthday;
+    user.role = req.body.role || user.role;
+    user.avatar = avatar;
+    user.isBlocked = req.body.isBlocked === "true";
+    user.loyalty.points = Number(req.body.loyaltyPoints) || user.loyalty.points;
+    user.loyalty.tier = req.body.loyaltyTier || user.loyalty.tier;
 
-    if (!req.body.password) delete user.password;
+    // Chỉ gán password nếu có nhập
+    if (req.body.password) {
+      user.password = req.body.password;
+    }
 
     await user.save();
 
