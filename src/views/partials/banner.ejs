@@ -1,6 +1,110 @@
 <link rel="stylesheet" href="/css/globe.css" />
+
+<style>
+  /* ===== MODAL THÔNG BÁO ===== */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    visibility: hidden;
+    opacity: 0;
+    transition: all 0.2s ease;
+  }
+  .modal-overlay.active {
+    visibility: visible;
+    opacity: 1;
+  }
+  .modal-box {
+    background: #fff;
+    padding: 24px;
+    border-radius: 10px;
+    width: 350px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    text-align: center;
+    font-family: sans-serif;
+  }
+  .modal-box.success { border-top: 5px solid #52c41a; }
+  .modal-box.error { border-top: 5px solid #ff4d4f; }
+  .modal-box h3 { margin-bottom: 10px; font-size: 18px; }
+  .modal-box p { margin-bottom: 16px; font-size: 14px; color: #555; }
+  .modal-btn {
+    padding: 8px 16px;
+    background: #1677ff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .modal-btn:hover { background: #4096ff; }
+  .image-preview img,
+.list-thumb {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid #eee;
+  background: #fafafa;
+  padding: 4px;
+}
+.item-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+.list-info {
+  flex: 1;
+}
+/* ===== NÚT TRẠNG THÁI ===== */
+.btn-toggle {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  transition: all 0.2s ease;
+}
+.btn-toggle.active {
+  background-color: #52c41a; /* Xanh lá */
+}
+.btn-toggle.inactive {
+    padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  background-color: #ff4d4f; /* Đỏ */
+}
+.btn-toggle:hover {
+  opacity: 0.8;
+  transform: scale(1.05);
+}
+
+</style>
+
+<!-- MODAL -->
+<div id="alertModal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 id="modalTitle">Thông báo</h3>
+    <p id="modalMessage"></p>
+    <button id="modalClose" class="modal-btn">Đóng</button>
+  </div>
+</div>
+
 <div class="container form-section">
-  <h2 class="title " style="margin-bottom: 20px;">Quản lý Banner & Logo</h2>
+  <h2 class="title" style="margin-bottom: 20px;">Quản lý Banner & Logo</h2>
 
   <!-- TABS -->
   <div class="tabs">
@@ -11,14 +115,14 @@
   <!-- BANNER SECTION -->
   <div id="banner-section" class="tab-content active">
     <div class="">
-      <form id="promotion-form" enctype="multipart/form-data">
+      <form id="banner-form" enctype="multipart/form-data">
         <input type="hidden" name="type" value="banner" />
 
         <h2>Thêm Banner</h2>
-        
         <input type="text" class="ant-input" name="title" placeholder="Tiêu đề" required />
         <textarea name="description" class="ant-input" placeholder="Mô tả (IN HOA)" rows="3"></textarea>
         <input type="text" class="ant-input" name="link" placeholder="Liên kết" />
+        <input type="number" class="ant-input" name="order" min="0" value="0" placeholder="Thứ tự hiển thị" />
         <select name="isActive" class="ant-input">
           <option value="true">Hiển thị</option>
           <option value="false">Ẩn</option>
@@ -70,9 +174,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const bannerSection = document.getElementById("banner-section");
   const logoSection = document.getElementById("logo-section");
 
+  // ====== MODAL ======
+  const modal = document.getElementById("alertModal");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalMessage = document.getElementById("modalMessage");
+  const modalClose = document.getElementById("modalClose");
+
+  function showModal(title, message, type = "info") {
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+    const box = modal.querySelector(".modal-box");
+    box.className = `modal-box ${type}`;
+    modal.classList.add("active");
+  }
+
+  modalClose.onclick = () => modal.classList.remove("active");
+  modal.onclick = e => { if (e.target === modal) modal.classList.remove("active"); };
+
+  // ====== TABS ======
   tabBanner.onclick = () => switchTab("banner");
   tabLogo.onclick = () => switchTab("logo");
-
   function switchTab(type) {
     document.querySelectorAll(".tab, .tab-content").forEach(el => el.classList.remove("active"));
     if (type === "banner") {
@@ -84,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // === PREVIEW ẢNH ===
+  // ====== PREVIEW ======
   function handlePreview(input, previewEl) {
     input.addEventListener("change", () => {
       previewEl.innerHTML = "";
@@ -97,31 +218,30 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-
   handlePreview(document.querySelector("input[name='bannerImage']"), document.getElementById("bannerPreview"));
   handlePreview(document.querySelector("input[name='logoImage']"), document.getElementById("logoPreview"));
 
-  // === LOAD MEDIA ===
+  // ====== LOAD MEDIA ======
   const bannerList = document.getElementById("banner-list");
   const logoList = document.getElementById("logo-list");
 
   async function loadMedia(type) {
-    const res = await fetch(`/api/banner?type=${type}`);
-    const data = await res.json();
     const target = type === "banner" ? bannerList : logoList;
-
-    if (!data.length) {
-      target.innerHTML = `<p class="empty">Chưa có ${type === "banner" ? "banner" : "logo"} nào.</p>`;
-      return;
-    }
-
-    target.innerHTML = data
-      .map(m => `
+    try {
+      const res = await fetch(`/api/banners?type=${type}`);
+      if (!res.ok) throw new Error("Không thể tải dữ liệu từ máy chủ!");
+      const data = await res.json();
+      if (!data.length) {
+        target.innerHTML = `<p class="empty">Chưa có ${type === "banner" ? "banner" : "logo"} nào.</p>`;
+        return;
+      }
+      target.innerHTML = data.map(m => `
         <div class="item-card">
           <img src="${m.image}" class="list-thumb" />
           <div class="list-info">
             <h3>${m.title || "(Không có tiêu đề)"}</h3>
             ${m.description ? `<p>${m.description}</p>` : ""}
+            <p>Thứ tự: ${m.order ?? 0}</p>
             <p>Trạng thái: 
               <span class="${m.isActive ? "status-active" : "status-inactive"}">
                 ${m.isActive ? "Hiển thị" : "Ẩn"}
@@ -129,52 +249,74 @@ document.addEventListener("DOMContentLoaded", () => {
             </p>
           </div>
           <div class="list-actions">
-            <button class="btn-delete" onclick="deleteMedia('${m._id}', '${type}')">Xóa</button>
+            <button 
+              class="btn-toggle ${m.isActive ? "active" : "inactive"}" 
+              title="${m.isActive ? "Đang hiển thị - bấm để ẩn" : "Đang ẩn - bấm để hiển thị"}"
+              onclick="toggleActive('${m._id}', '${type}', ${m.isActive})">
+              ${m.isActive ? "✓" : "✕"}
+            </button>
+            <button class="btn-delete" onclick="deleteMedia('${m._id}', '${type}')">🗑️</button>
           </div>
         </div>
       `).join("");
-  }
 
-  // === TẠO MỚI ===
+    } catch (err) {
+      target.innerHTML = `<p class="error">❌ Lỗi tải ${type}: ${err.message}</p>`;
+    }
+  }
+  window.toggleActive = async (id, type, current) => {
+    const newStatus = !current;
+    try {
+      const res = await fetch(`/api/banners/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Không thể cập nhật trạng thái!");
+      showModal("Thành công", `Đã ${newStatus ? "hiển thị" : "ẩn"} ${type}!`, "success");
+      loadMedia(type);
+    } catch (err) {
+      showModal("Lỗi", err.message, "error");
+    }
+  };
+
+  // ====== TẠO MỚI ======
   const bannerForm = document.getElementById("banner-form");
   const logoForm = document.getElementById("logo-form");
 
-  bannerForm.onsubmit = async e => {
-    e.preventDefault();
-    const fd = new FormData(bannerForm);
-    const res = await fetch("/api/banner", { method: "POST", body: fd });
-    if (res.ok) {
-      alert("Đã thêm banner!");
-      bannerForm.reset();
-      document.getElementById("bannerPreview").innerHTML = "";
-      loadMedia("banner");
-    } else {
-      alert("Lỗi thêm banner!");
+  async function submitForm(form, type) {
+    try {
+      const fd = new FormData(form);
+      const res = await fetch("/api/banners", { method: "POST", body: fd });
+      const msg = type === "banner" ? "banner" : "logo";
+      if (!res.ok) throw new Error(`Lỗi khi thêm ${msg}!`);
+      showModal("Thành công", `🎉 Đã thêm ${msg} mới!`, "success");
+      form.reset();
+      form.querySelector(".image-preview").innerHTML = "";
+      loadMedia(type);
+    } catch (err) {
+      showModal("Lỗi", err.message, "error");
     }
-  };
+  }
 
-  logoForm.onsubmit = async e => {
-    e.preventDefault();
-    const fd = new FormData(logoForm);
-    const res = await fetch("/api/banner", { method: "POST", body: fd });
-    if (res.ok) {
-      alert("Đã thêm logo!");
-      logoForm.reset();
-      document.getElementById("logoPreview").innerHTML = "";
-      loadMedia("logo");
-    } else {
-      alert("Lỗi thêm logo!");
-    }
-  };
+  bannerForm.onsubmit = e => { e.preventDefault(); submitForm(bannerForm, "banner"); };
+  logoForm.onsubmit = e => { e.preventDefault(); submitForm(logoForm, "logo"); };
 
-  // === XÓA ===
+  // ====== XÓA ======
   window.deleteMedia = async (id, type) => {
     if (!confirm("Bạn có chắc muốn xóa không?")) return;
-    await fetch(`/api/banner/${id}`, { method: "DELETE" });
-    loadMedia(type);
+    try {
+      const res = await fetch(`/api/banners/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Không thể xóa, vui lòng thử lại!");
+      showModal("Thành công", "🗑️ Đã xóa thành công!", "success");
+      loadMedia(type);
+    } catch (err) {
+      showModal("Lỗi", err.message, "error");
+    }
   };
 
-  // === KHỞI TẠO ===
+  // ====== KHỞI TẠO ======
   loadMedia("banner");
   loadMedia("logo");
 });

@@ -88,8 +88,9 @@
 <body>
   <div class="login-wrapper">
     <div class="login-box">
-      <img
-        src="https://res.cloudinary.com/dnyb9bbkr/image/upload/v1761499434/osso/variants/1761499432471_9bispp02x.jpg"
+      <img 
+        id="adminLogo" 
+        src="../../imgs/Logo-Osso.jpg"
         alt="Logo"
         class="login-logo"
       />
@@ -157,6 +158,24 @@
         errorDiv.style.display = 'block';
       }
     });
+    document.addEventListener("DOMContentLoaded", async () => {
+    try {
+      const res = await fetch("/api/banners/active?type=logo");
+      if (!res.ok) throw new Error("Không thể tải logo!");
+
+      const data = await res.json();
+      const logo = data[0]; // chỉ lấy cái đầu tiên (vì chỉ 1 logo active)
+      const imgEl = document.getElementById("adminLogo");
+
+      if (logo?.image) {
+        imgEl.src = logo.image;
+      } else {
+        imgEl.src = "/images/default-logo.png"; // fallback nếu không có
+      }
+    } catch (err) {
+      console.warn("⚠️ Lỗi tải logo:", err.message);
+    }
+  });
   </script>
 </body>
 </html>

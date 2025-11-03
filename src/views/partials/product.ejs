@@ -168,101 +168,122 @@ function addVariantRow(body, variant = {}, isEdit = false) {
   const rowIndex = body.children.length;
   const maxImages = 6;
   const currentImages = variant.images || [];
+  const isEditingExisting = isEdit && variant._id; // true nếu đang sửa variant cũ
 
   const row = document.createElement("tr");
+
   row.innerHTML = `
+    ${isEditingExisting ? `<input type="hidden" name="existingVariantId[]" value="${variant._id}">` : ""}
     <td data-label="Màu">
-      <select name="variantColor[]" required class="ant-input" style="font-size:13px;">
-        <option value="">--Màu--</option>
-        ${colorsRes.map(c => `<option value="${c._id}" ${c._id === (variant.color?._id || variant.color) ? 'selected' : ''}>${c.name}</option>`).join("")}
-      </select>
+      ${isEditingExisting
+        ? `
+           <span>${variant.color?.name || 'N/A'}</span>
+           <input type="hidden" name="variantColor[]" value="${variant.color?._id || variant.color || ''}">
+           <input type="hidden" name="existingVariantColor[]" value="${variant.color?._id || variant.color || ''}">
+          `
+        : `
+           <select name="variantColor[]" required class="ant-input" style="font-size:13px;">
+             <option value="">--Màu--</option>
+             ${colorsRes.map(c => `
+               <option value="${c._id}" ${c._id === (variant.color?._id || variant.color) ? 'selected' : ''}>
+                 ${c.name}
+               </option>`).join("")}
+           </select>
+          `}
     </td>
+
     <td data-label="Size">
-      <select name="variantSize[]" required class="ant-input" style="font-size:13px;">
-        <option value="">--Size--</option>
-        ${sizesRes.map(s => `<option value="${s._id}" ${s._id === (variant.size?._id || variant.size) ? 'selected' : ''}>${s.name}</option>`).join("")}
-      </select>
+      ${isEditingExisting
+        ? `
+           <span>${variant.size?.name || 'N/A'}</span>
+           <input type="hidden" name="variantSize[]" value="${variant.size?._id || variant.size || ''}">
+           <input type="hidden" name="existingVariantSize[]" value="${variant.size?._id || variant.size || ''}">
+          `
+        : `
+           <select name="variantSize[]" required class="ant-input" style="font-size:13px;">
+             <option value="">--Size--</option>
+             ${sizesRes.map(s => `
+               <option value="${s._id}" ${s._id === (variant.size?._id || variant.size) ? 'selected' : ''}>
+                 ${s.name}
+               </option>`).join("")}
+           </select>
+          `}
     </td>
-    <td data-label="Số lượng"><input type="number" name="variantStock[]" value="${variant.quantity || 0}" min="0" class="ant-input" required></td>
-    <td data-label="Giá"><input type="number" name="variantPrice[]" value="${variant.price || 0}" min="1" step="1" class="ant-input" required></td>
+
+    <td data-label="Số lượng">
+      <input type="number" name="variantStock[]" value="${variant.stockQuantity || 0}" min="0" class="ant-input" required>
+    </td>
+
+    <td data-label="Giá">
+      <input type="number" name="variantPrice[]" value="${variant.price || 0}" min="1" step="1" class="ant-input" required>
+    </td>
+
     <td data-label="Ảnh" style="position:relative;">
-      <input type="file" name="" accept="image/*" multiple class="variant-file-input">
       <div class="image-preview" style="margin-top:4px; display:flex; flex-wrap:wrap; gap:6px; max-height:80px; overflow-y:auto;"></div>
+      <input type="file" name="variantImageFile[${rowIndex}]" accept="image/*" multiple class="variant-file-input" style="margin-top:4px;">
       <small style="color:#999; font-size:10px;">Tối đa 6 ảnh</small>
     </td>
-    <td data-label="Hành động"><button type="button" class="btn-remove">Xóa</button></td>
+
+    <td data-label="Hành động">
+      <button type="button" class="btn-remove">Xóa</button>
+    </td>
   `;
 
   body.appendChild(row);
 
-  const fileInput = row.querySelector("input[type='file']");
+  // ====== ẢNH CÓ SẴN ======
   const preview = row.querySelector(".image-preview");
-
   currentImages.forEach((src, idx) => {
     const div = document.createElement("div");
     div.className = "image-item";
     div.style.position = "relative";
     div.innerHTML = `
-      <img src="${src}" data-original="${src}" style="width:40px; height:40px; object-fit:cover; border:${idx===0?'2px solid #ff6b6b':'1px solid #ddd'}; border-radius:4px;">
-      <button type="button" style="position:absolute; top:0; right:0; background:red; color:white; border:none; width:16px; height:16px; font-size:10px; border-radius:50%;">x</button>
-      ${idx === 0 ? '<div style="position:absolute; top:2px; left:2px; background:#ff6b6b; color:white; font-size:8px; padding:1px 4px; border-radius:2px;">BÌA</div>' : ''}
+      <img src="${src}" data-original="${src}"
+        style="width:40px;height:40px;object-fit:cover;border:${idx===0?'2px solid #ff6b6b':'1px solid #ddd'};border-radius:4px;">
+      <button type="button" class="remove-img"
+        style="position:absolute;top:0;right:0;background:red;color:white;border:none;width:16px;height:16px;font-size:10px;border-radius:50%;">x</button>
+      ${idx === 0 ? '<div style="position:absolute;top:2px;left:2px;background:#ff6b6b;color:white;font-size:8px;padding:1px 4px;border-radius:2px;">BÌA</div>' : ''}
+      <input type="hidden" name="keepImages[]" value="${src}">
     `;
-    div.querySelector("button").onclick = () => { div.remove(); updateCover(); };
+    div.querySelector(".remove-img").onclick = () => div.remove();
     preview.appendChild(div);
   });
 
-  const updateCover = () => {
-    const items = preview.querySelectorAll(".image-item");
-    items.forEach((item, i) => {
-      const img = item.querySelector("img");
-      const badge = item.querySelector("div");
-      img.style.border = i === 0 ? "2px solid #ff6b6b" : "1px solid #ddd";
-      if (i === 0 && !badge) {
-        const newBadge = document.createElement("div");
-        newBadge.textContent = "BÌA";
-        newBadge.style.cssText = "position:absolute; top:2px; left:2px; background:#ff6b6b; color:white; font-size:8px; padding:1px 4px; border-radius:2px;";
-        item.appendChild(newBadge);
-      } else if (i !== 0 && badge) {
-        badge.remove();
+  // ====== UPLOAD ẢNH MỚI ======
+  const fileInput = row.querySelector(".variant-file-input");
+  if (fileInput) {
+    fileInput.onchange = () => {
+      const files = Array.from(fileInput.files);
+      const currentCount = preview.querySelectorAll(".image-item").length;
+      if (currentCount + files.length > maxImages) {
+        showToast("Tối đa 6 ảnh!", "error");
+        fileInput.value = "";
+        return;
       }
-    });
-    fileInput.disabled = items.length >= maxImages;
-  };
-  updateCover();
-
-  fileInput.onchange = null; 
-  fileInput.onchange = () => {
-    const files = Array.from(fileInput.files);
-    const currentCount = preview.querySelectorAll(".image-item").length;
-    if (currentCount + files.length > 6) {
-      showToast("Tối đa 6 ảnh!");
-      fileInput.value = "";
-      return;
-    }
-
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const div = document.createElement("div");
-        div.className = "image-item";
-        div.style.position = "relative";
-        div.innerHTML = `
-          <img src="${e.target.result}" style="width:40px;height:40px;object-fit:cover;border:1px solid #ddd;border-radius:4px;">
-          <button type="button" style="position:absolute;top:0;right:0;background:red;color:white;border:none;width:16px;height:16px;font-size:10px;border-radius:50%;">x</button>
-        `;
-        div.querySelector("button").onclick = () => {
-          div.remove();
-          updateCover();
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const div = document.createElement("div");
+          div.className = "image-item";
+          div.style.position = "relative";
+          div.innerHTML = `
+            <img src="${e.target.result}" style="width:40px;height:40px;object-fit:cover;border:1px solid #ddd;border-radius:4px;">
+            <button type="button" class="remove-img"
+              style="position:absolute;top:0;right:0;background:red;color:white;border:none;width:16px;height:16px;font-size:10px;border-radius:50%;">x</button>
+          `;
+          div.querySelector(".remove-img").onclick = () => div.remove();
+          preview.appendChild(div);
         };
-        preview.appendChild(div);
-        updateCover();
-      };
-      reader.readAsDataURL(file);
-    });
+        reader.readAsDataURL(file);
+      });
+    };
   }
 
+  // ====== XÓA VARIANT ======
   row.querySelector(".btn-remove").onclick = () => row.remove();
 }
+
+
 
 // === DOMContentLoaded ===
 document.addEventListener("DOMContentLoaded", async () => {
@@ -474,8 +495,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const body = document.getElementById("editVariantBody");
       body.innerHTML = "";
+      
       p.variants.forEach(v => addVariantRow(body, v, true));
 
+      const btnAddVariant = document.getElementById("edit-addVariant");
+      if (btnAddVariant) {
+        btnAddVariant.onclick = () => addVariantRow(body, {}, true);
+      }
       document.getElementById('editModal').style.display = 'block';
 
       // Gắn lại sự kiện cho nút thêm biến thể
@@ -490,66 +516,69 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // === CẬP NHẬT ===
   document.getElementById("edit-form").onsubmit = async e => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const id = document.getElementById("edit-id").value;
+  e.preventDefault();
+  const formData = new FormData();
+  const id = document.getElementById("edit-id").value;
 
-    // Xóa field cũ
-    for (const key of Array.from(formData.keys())) {
-      if (key.includes('[')) formData.delete(key);
-    }
+  const rows = document.querySelectorAll("#editVariantBody tr");
+  const variants = [];
 
-    const rows = document.querySelectorAll("#editVariantBody tr");
-    let hasVariant = false;
+  for (const [i, row] of rows.entries()) {
+    const colorId =
+      row.querySelector("select[name='variantColor[]']")?.value ||
+      row.querySelector("input[name='variantColor[]']")?.value;
 
-    rows.forEach((row, i) => {
-      const fileInput = row.querySelector("input[type='file']");
+    const sizeId =
+      row.querySelector("select[name='variantSize[]']")?.value ||
+      row.querySelector("input[name='variantSize[]']")?.value;
+
+    const stock = Number(row.querySelector("input[name='variantStock[]']")?.value || 0);
+    const price = Number(row.querySelector("input[name='variantPrice[]']")?.value || 0);
+
+    if (!colorId || !sizeId) continue;
+
+    // 🧩 SKU đồng nhất với backend
+    const baseSKU = document.getElementById("edit-SKU").value;
+    const sku = `${baseSKU}-${colorId}-${sizeId}`.toUpperCase();
+
+    variants.push({ sku, color: colorId, size: sizeId, stock, price });
+
+    // 🖼️ Gửi ảnh cho từng màu (upload một lần mỗi colorId)
+    const fileInput = row.querySelector("input[type='file']");
+    if (fileInput?.files.length && colorId) {
       for (const f of fileInput.files) {
-        formData.append(`variantImageFile[${i}]`, f);
+        formData.append(`variantImageFile[${colorId}]`, f);
       }
+    }
+  }
 
-      const existingId = row.querySelector("input[name*='existingVariantId']");
-      if (existingId) {
-        formData.append(`existingVariantId[${i}]`, existingId.value);
-        const price = row.querySelector("input[name*='Price']")?.value;
-        const stock = row.querySelector("input[name*='Stock']")?.value;
-        if (price) formData.append(`variantPrice[${i}]`, price);
-        if (stock) formData.append(`variantStock[${i}]`, stock);
-        hasVariant = true;
-      }
+  if (!variants.length) return showToast("Cần ít nhất 1 biến thể!", "error");
 
-      const newColor = row.querySelector("select[name*='newVariantColor']");
-      if (newColor) {
-        const color = newColor.value;
-        const size = row.querySelector("select[name*='newVariantSize']").value;
-        const price = row.querySelector("input[name*='newVariantPrice']").value;
-        const stock = row.querySelector("input[name*='newVariantStock']").value;
-        if (color && size && price > 0) {
-          formData.append(`newVariantColor[${i}]`, color);
-          formData.append(`newVariantSize[${i}]`, size);
-          formData.append(`newVariantPrice[${i}]`, price);
-          formData.append(`newVariantStock[${i}]`, stock);
-          hasVariant = true;
-        }
-      }
+  // 🧩 Gửi toàn bộ variants dưới dạng JSON
+  formData.append("variants", JSON.stringify(variants));
+
+  // 🧩 Gắn lại các field chung
+  const fields = ["SKU", "name", "brand", "category", "description"];
+  fields.forEach(f => {
+    const el = document.getElementById(`edit-${f}`);
+    if (el?.value) formData.append(f, el.value.trim());
+  });
+
+  try {
+    const res = await fetch(`/api/products/${id}`, {
+      method: "PUT",
+      body: formData
     });
-
-    if (!hasVariant) return showToast("Cần ít nhất 1 biến thể!", "error");
-
-    ['SKU', 'name', 'brand', 'category', 'description'].forEach(f => {
-      const val = document.getElementById(`edit-${f}`).value.trim();
-      if (val) formData.append(f, val);
-    });
-
-    const res = await fetch(`/api/products/${id}`, { method: "PUT", body: formData });
     const data = await res.json();
-    if (!res.ok) return showToast(data.error || "Lỗi cập nhật", "error");
+    if (!res.ok) throw new Error(data.error || "Lỗi cập nhật");
 
     showToast("Cập nhật thành công!");
     closeEditModal();
     loadProducts();
-  };
-
+  } catch (err) {
+    showToast("Lỗi: " + err.message, "error");
+  }
+};
 
 
   window.closeEditModal = () => document.getElementById('editModal').style.display = 'none';

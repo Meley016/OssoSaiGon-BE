@@ -1,16 +1,23 @@
+// routes/banner.js
 const express = require("express");
 const router = express.Router();
 const upload = require("../middlewares/uploadImagesCloudinary");
 const bannerCtrl = require("../controllers/bannerController");
-const { protect, adminAuth } = require("../middlewares/auth");
+const { protect, adminAuth, apiProtect } = require("../middlewares/auth");
 
-// Cho admin
-router.get("/", protect, adminAuth, bannerCtrl.getAll);
-router.post("/", protect, adminAuth, upload, bannerCtrl.create);
-router.put("/:id", protect, adminAuth, upload, bannerCtrl.update);
-router.delete("/:id", protect, adminAuth, bannerCtrl.remove);
-
-// Cho client
+// 🟢 LẤY DANH SÁCH CHO CLIENT (không cần đăng nhập)
 router.get("/active", bannerCtrl.getActive);
+
+// 🟢 LẤY DANH SÁCH CHO ADMIN DASHBOARD (phải đăng nhập)
+router.get("/", bannerCtrl.getAll);
+
+// 🟡 TẠO MỚI (ADMIN)
+router.post("/", upload, bannerCtrl.create);
+
+// 🔵 CẬP NHẬT (ADMIN)
+router.put("/:id", upload, bannerCtrl.update);
+
+// 🔴 XÓA (ADMIN)
+router.delete("/:id", bannerCtrl.remove);
 
 module.exports = router;

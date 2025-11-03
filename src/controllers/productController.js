@@ -337,7 +337,6 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
-
 // === GET BY ID ===
 exports.getProductById = async (req, res) => {
   try {
@@ -451,90 +450,98 @@ exports.createProduct = async (req, res) => {
   }
 };
 
-
 // === UPDATE PRODUCT ===
 exports.updateProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
-    if (!product) return res.status(404).json({ error: "Không tìm thấy!" });
+    console.log("🧩 BODY:", Object.keys(req.body));
+    const { id } = req.params;
+    const product = await Product.findById(id);
+    if (!product) return res.status(404).json({ error: "Không tìm thấy sản phẩm!" });
 
     const body = req.body;
     const { variantImages } = splitFiles(req.files);
 
-    // === 1. Cập nhật biến thể cũ (dựa trên existingVariantId) ===
-    const existingIndexes = Object.keys(body).filter(k => k.startsWith('existingVariantId['));
-    const updatedIds = new Set();
+    // 1️⃣ Cập nhật thông tin chung
+    const fields = ["name", "brand", "category", "description", "SKU"];
+    let hasChange = false;
 
-    for (const key of existingIndexes) {
-      const i = key.match(/\[(\d+)\]/)[1];
-      const variantId = body[`existingVariantId[${i}]`];
-      const variant = product.variants.id(variantId);
-      if (!variant) continue;
-
-      updatedIds.add(variantId);
-
-      // Chỉ cập nhật SL + Giá
-      variant.stockQuantity = parseInt(body[`variantStock[${i}]`] || variant.stockQuantity);
-      variant.price = parseInt(body[`variantPrice[${i}]`] || variant.price);
-      variant.importPrice = variant.price * 0.8;
-
-      // === Thêm ảnh mới (nếu có) ===
-      // const newImgs = (variantImages[i] || []).map(fileToUrl);
-      // if (newImgs.length) {
-      //   const finalImgs = [...new Set([...variant.images, ...newImgs])];
-      //   if (finalImgs.length === 0) return res.status(400).json({ error: "Cần ít nhất 1 ảnh!" });
-      //   variant.images = finalImgs;
-      //   variant.coverImage = finalImgs[0];
-      // }
-    }
-
-    // === 2. Tạo biến thể mới ===
-    const newIndexes = Object.keys(body).filter(k => k.startsWith('newVariantColor['));
-    for (const key of newIndexes) {
-      const i = key.match(/\[(\d+)\]/)[1];
-      const colorId = body[`newVariantColor[${i}]`];
-      const sizeId = body[`newVariantSize[${i}]`];
-      const price = parseInt(body[`newVariantPrice[${i}]`] || 0);
-      const stock = parseInt(body[`newVariantStock[${i}]`] || 0);
-      const imgs = (variantImages[i] || []).map(fileToUrl);
-
-      if (!colorId || !sizeId || !imgs.length || price <= 0) continue;
-
-      const color = await Color.findById(colorId);
-      const size = await Size.findById(sizeId);
-      if (!color || !size) continue;
-
-      product.variants.push({
-        sku: `${body.SKU || product.groupId}-${color.name}-${size.name}`.toUpperCase(),
-        color: color._id,
-        size: size._id,
-        price,
-        stockQuantity: stock,
-        importPrice: price * 0.8,
-        images: imgs,
-        coverImage: imgs[0],
-      });
-    }
-
-    // === 3. Xóa biến thể không còn trong form ===
-    product.variants = product.variants.filter(v => {
-      if (v._id && !updatedIds.has(v._id.toString())) {
-        v.images.forEach(url => {
-          const pid = extractPublicId(url);
-          if (pid) cloudinary.uploader.destroy(pid).catch(() => {});
-        });
-        return false;
+    fields.forEach(f => {
+      if (body[f] !== undefined && body[f] !== "") {
+        if (f === "SKU") product.groupId = body[f];
+        else product[f] = body[f];
+        hasChange = true;
       }
-      return true;
     });
 
-    // === 4. Cập nhật chung (nếu có) ===
-    if (body.SKU) product.groupId = body.SKU;
-    if (body.name) product.name = body.name;
-    if (body.brand) product.brand = body.brand;
-    if (body.category) product.category = body.category;
-    if (body.description !== undefined) product.description = body.description;
+    // === Folder Cloudinary
+    const safeName = product.name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    const baseFolder = `osso/products/${safeName}`;
 
+    // === Lấy danh sách variant mới từ client
+    const variantCount = Object.keys(body).filter(k => k.startsWith("variantSKU[")).length;
+    const newVariants = [];
+
+    for (let i = 0; i < variantCount; i++) {
+      const sku = body[`variantSKU[${i}]`];
+      const colorId = body[`variantColor[${i}]`];
+      const sizeId = body[`variantSize[${i}]`];
+      const stock = Number(body[`variantStock[${i}]`] || 0);
+      const price = Number(body[`variantPrice[${i}]`] || 0);
+      const files = variantImages[colorId] || [];
+
+      // === Nếu variant đã tồn tại → cập nhật
+      let variant = product.variants.find(v => v.sku === sku);
+
+      // Upload ảnh nếu có
+      let uploadedUrls = [];
+      if (files.length) {
+        for (const f of files) {
+          const uploadRes = await cloudinary.uploader.upload(f.path, {
+            folder: `${baseFolder}/${colorId}`,
+            unique_filename: true,
+            overwrite: false,
+          });
+          uploadedUrls.push(uploadRes.secure_url);
+        }
+      }
+
+      if (variant) {
+        variant.price = price;
+        variant.stockQuantity = stock;
+        variant.importPrice = Math.round(price * 0.8);
+
+        // Nếu có ảnh mới → thay ảnh
+        if (uploadedUrls.length) {
+          variant.images = uploadedUrls;
+          variant.coverImage = uploadedUrls[0];
+        }
+
+        newVariants.push(variant.sku); // Ghi nhận để giữ lại
+      } else {
+        // === Variant mới
+        const color = await Color.findById(colorId);
+        const size = await Size.findById(sizeId);
+        if (!color || !size) continue;
+
+        const newVariant = {
+          sku,
+          color: colorId,
+          size: sizeId,
+          price,
+          stockQuantity: stock,
+          importPrice: Math.round(price * 0.8),
+          images: uploadedUrls,
+          coverImage: uploadedUrls[0] || null,
+        };
+        product.variants.push(newVariant);
+        newVariants.push(sku);
+      }
+    }
+
+    // 3️⃣ Xóa variant không còn trong form (client không gửi lên nữa)
+    product.variants = product.variants.filter(v => newVariants.includes(v.sku));
+
+    // 4️⃣ Lưu thay đổi
     await product.save();
 
     const populated = await Product.findById(product._id)
@@ -549,7 +556,6 @@ exports.updateProduct = async (req, res) => {
     res.status(500).json({ error: "Lỗi cập nhật", details: err.message });
   }
 };
-
 
 // === DELETE PRODUCT ===
 exports.deleteProduct = async (req, res) => {

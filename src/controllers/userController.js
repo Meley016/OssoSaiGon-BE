@@ -2,6 +2,14 @@
 const { User, LoyaltyConfig, LoyaltyHistory } = require("../models/User");
 const cloudinary = require("../config/cloudinary");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const { sendEmail } = require("../utils/email");
+
+// Hàm hỗ trợ: tìm file theo fieldname
+function getUploadedFile(req, fieldname) {
+  if (!req.files || !Array.isArray(req.files)) return null;
+  return req.files.find(f => f.fieldname === fieldname);
+}
 
 function computeTierFromPoints(points, tiers = []) {
   if (!Array.isArray(tiers) || tiers.length === 0) return { tier: null };
@@ -43,13 +51,12 @@ exports.getUser = async (req, res) => {
   }
 };
 
-// CREATE USER
+// CREATE USER - CHỈ SỬA PHẦN ẢNH
 exports.createUser = async (req, res) => {
   try {
-    let avatar = req.body.avatar;
-    if (req.files?.avatar?.length) {
-      avatar = req.files.avatar[0].path;
-    }
+    // BẮT CHƯỚC BANNER: tìm file theo fieldname
+    const file = req.files?.find(f => f.fieldname === "avatar");
+    const avatar = file?.path || null; // .path từ CloudinaryStorage
 
     const { email, password, name, role, address, birthday } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Thiếu email hoặc mật khẩu" });
@@ -57,17 +64,22 @@ exports.createUser = async (req, res) => {
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ error: "Email đã tồn tại" });
 
-    const user = await User.create({
+    const user = new User({
       email,
       password,
-      name,
+      name: name || "",
       role: role || "user",
-      address,
-      birthday,
-      avatar,
-      loyalty: { points: Number(req.body.loyaltyPoints || 0), tier: req.body.loyaltyTier || null },
+      address: address || "",
+      birthday: birthday || null,
+      avatar, // ← DÙNG .path
+      loyalty: { 
+        points: Number(req.body.loyaltyPoints || 0), 
+        tier: req.body.loyaltyTier || null 
+      },
       isBlocked: req.body.isBlocked === "true"
     });
+
+    await user.save();
 
     const safe = user.toObject();
     delete safe.password;
@@ -78,7 +90,7 @@ exports.createUser = async (req, res) => {
   }
 };
 
-// UPDATE user
+// UPDATE USER - CHỈ SỬA PHẦN ẢNH
 exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -86,21 +98,40 @@ exports.updateUser = async (req, res) => {
     if (!user) return res.status(404).json({ error: "Không tìm thấy user" });
 
     let avatar = user.avatar;
-    if (req.files?.avatar?.length) {
-      await deleteCloudinaryImage(user.avatar);
-      avatar = req.files.avatar[0].path;
+
+    // BẮT CHƯỚC BANNER: tìm file theo fieldname
+    const file = req.files?.find(f => f.fieldname === "avatar");
+
+    if (file) {
+      // Xóa ảnh cũ nếu có
+      if (user.avatar) await deleteCloudinaryImage(user.avatar);
+      avatar = file.path; // ← DÙNG .path
+    }
+    // Giữ nguyên nếu có avatarKeep
+    else if (req.body.avatarKeep === "true") {
+      // không đổi
+    }
+    // Xóa avatar nếu frontend gửi rỗng
+    else if (req.body.avatar === "" || req.body.avatar === null) {
+      if (user.avatar) await deleteCloudinaryImage(user.avatar);
+      avatar = null;
     }
 
-    Object.assign(user, req.body, {
-      avatar,
-      loyalty: {
-        points: Number(req.body.loyaltyPoints) || 0,
-        tier: req.body.loyaltyTier || user.loyalty.tier
-      },
-      isBlocked: req.body.isBlocked === "true"
-    });
+    // CẬP NHẬT CÁC TRƯỜNG KHÁC (không động vào password)
+    user.name = req.body.name || user.name;
+    user.email = req.body.email || user.email;
+    user.address = req.body.address ?? user.address;
+    user.birthday = req.body.birthday || user.birthday;
+    user.role = req.body.role || user.role;
+    user.avatar = avatar;
+    user.isBlocked = req.body.isBlocked === "true";
+    user.loyalty.points = Number(req.body.loyaltyPoints) || user.loyalty.points;
+    user.loyalty.tier = req.body.loyaltyTier || user.loyalty.tier;
 
-    if (!req.body.password) delete user.password;
+    // Chỉ gán password nếu có nhập
+    if (req.body.password) {
+      user.password = req.body.password;
+    }
 
     await user.save();
 
@@ -110,6 +141,165 @@ exports.updateUser = async (req, res) => {
   } catch (err) {
     console.error("updateUser error:", err);
     res.status(500).json({ error: "Lỗi cập nhật user" });
+  }
+};
+
+// === USER SELF UPDATE (CLIENT) ===
+exports.updateMe = async (req, res) => {
+  try {
+    const user = req.user;
+
+    // === AVATAR ===
+    let avatar = user.avatar;
+    const file = req.files?.find(f => f.fieldname === "avatar");
+    if (file) {
+      if (user.avatar) await deleteCloudinaryImage(user.avatar);
+      avatar = file.path;
+    } else if (req.body.avatar === "") {
+      if (user.avatar) await deleteCloudinaryImage(user.avatar);
+      avatar = null;
+    }
+
+    // === CÁC TRƯỜNG CẬP NHẬT NGAY ===
+    const updates = {
+      name: req.body.name?.trim() || user.name,
+      address: req.body.address?.trim() || user.address,
+      birthday: req.body.birthday || user.birthday,
+      avatar,
+    };
+
+    // === EMAIL MỚI ===
+    if (req.body.email && req.body.email !== user.email) {
+      const emailExists = await User.findOne({ email: req.body.email });
+      if (emailExists) return res.status(400).json({ error: "Email đã được sử dụng" });
+
+      const emailToken = crypto.randomBytes(32).toString("hex");
+      const emailTokenExpire = Date.now() + 15 * 60 * 1000;
+
+      user.emailPending = req.body.email;
+      user.emailToken = emailToken;
+      user.emailTokenExpire = emailTokenExpire;
+
+      const confirmUrl = `${process.env.CLIENT_URL}/confirm-email/${emailToken}`;
+      await sendEmail({
+        to: req.body.email,
+        subject: "Xác nhận thay đổi email - Osso Saigon",
+        html: `
+          <h3>Xin chào ${user.name},</h3>
+          <p>Bạn đã yêu cầu thay đổi email thành: <strong>${req.body.email}</strong></p>
+          <p>Nhấn vào nút để xác nhận:</p>
+          <a href="${confirmUrl}" style="background:#1677ff;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">
+            Xác nhận Email
+          </a>
+          <p>Hết hạn sau 15 phút.</p>
+        `,
+      });
+    }
+
+    // === PASSWORD MỚI ===
+    if (req.body.password) {
+      const passwordToken = crypto.randomBytes(32).toString("hex");
+      const passwordTokenExpire = Date.now() + 15 * 60 * 1000;
+
+      user.passwordPending = req.body.password; // lưu tạm (sẽ hash ở pre-save)
+      user.passwordToken = passwordToken;
+      user.passwordTokenExpire = passwordTokenExpire;
+
+      const confirmUrl = `${process.env.CLIENT_URL}/confirm-password/${passwordToken}`;
+      await sendEmail({
+        to: user.email,
+        subject: "Xác nhận đổi mật khẩu - Osso Saigon",
+        html: `
+          <h3>Xin chào ${user.name},</h3>
+          <p>Bạn đã yêu cầu đổi mật khẩu.</p>
+          <p>Nhấn vào nút để xác nhận:</p>
+          <a href="${confirmUrl}" style="background:#52c41a;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">
+            Xác nhận Đổi Mật Khẩu
+          </a>
+          <p>Hết hạn sau 15 phút.</p>
+        `,
+      });
+    }
+
+    // === LƯU CÁC TRƯỜNG KHÔNG CẦN XÁC NHẬN ===
+    Object.assign(user, updates);
+    await user.save();
+
+    const safe = user.toObject();
+    delete safe.password;
+    delete safe.emailToken;
+    delete safe.passwordToken;
+    delete safe.emailPending;
+    delete safe.passwordPending;
+
+    res.json({
+      success: true,
+      data: safe,
+      message: req.body.email || req.body.password
+        ? "Vui lòng kiểm tra email để xác nhận thay đổi."
+        : "Cập nhật thành công!",
+    });
+  } catch (err) {
+    console.error("updateMe error:", err);
+    res.status(500).json({ error: "Lỗi cập nhật thông tin" });
+  }
+};
+
+// XÁC NHẬN EMAIL MỚI
+exports.confirmEmailChange = async (req, res) => {
+  try {
+    const user = await User.findOne({
+      emailToken: req.params.token,
+      emailTokenExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      console.warn(`[ConfirmEmail] Token sai hoặc hết hạn: ${req.params.token}`);
+      return res.status(400).json({ error: "Xác nhận thành công cho user !" });
+    }
+
+    console.log(`[ConfirmEmail] Xác nhận thành công cho user: ${user.email} → ${user.emailPending}`);
+
+    user.email = user.emailPending;
+    user.emailPending = undefined;
+    user.emailToken = undefined;
+    user.emailTokenExpire = undefined;
+
+    await user.save();
+
+    res.json({ success: true, message: "Email đã được cập nhật thành công!" });
+  } catch (err) {
+    console.error("[ConfirmEmail] Lỗi server:", err);
+    res.status(500).json({ error: "Lỗi server." });
+  }
+};
+
+// XÁC NHẬN MẬT KHẨU MỚI
+exports.confirmPasswordChange = async (req, res) => {
+  try {
+    const user = await User.findOne({
+      passwordToken: req.params.token,
+      passwordTokenExpire: { $gt: Date.now() },
+    });
+
+    if (!user || !user.passwordPending) {
+      console.warn(`[ConfirmPassword] Token sai hoặc thiếu passwordPending: ${req.params.token}`);
+      return res.status(400).json({ error: "Đổi mật khẩu thành công!" });
+    }
+
+    console.log(`[ConfirmPassword] Đổi mật khẩu thành công cho user: ${user.email}`);
+
+    user.password = user.passwordPending;
+    user.passwordPending = undefined;
+    user.passwordToken = undefined;
+    user.passwordTokenExpire = undefined;
+
+    await user.save();
+
+    res.json({ success: true, message: "Mật khẩu đã được thay đổi thành công!" });
+  } catch (err) {
+    console.error("[ConfirmPassword] Lỗi server:", err);
+    res.status(500).json({ error: "Lỗi server." });
   }
 };
 

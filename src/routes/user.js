@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
-const { protect, adminAuth } = require("../middlewares/auth");
+const { protect, apiProtect, adminAuth } = require("../middlewares/auth");
 const upload = require("../middlewares/uploadImagesCloudinary");
 
 // Loyalty routes
@@ -14,6 +14,10 @@ router.put("/:id/loyalty/adjust", protect, adminAuth, userController.adjustUserP
 router.put("/:id/loyalty/set-tier", protect, adminAuth, userController.setUserTier);
 
 // CRUD
+router.put("/me", apiProtect, upload, userController.updateMe);
+router.get("/confirm-email/:token", userController.confirmEmailChange);
+router.get("/confirm-password/:token", userController.confirmPasswordChange);
+
 router.get("/", protect, adminAuth, userController.getUsers);
 router.get("/:id", protect, adminAuth, userController.getUser);
 router.post("/", protect, adminAuth, upload, userController.createUser);
