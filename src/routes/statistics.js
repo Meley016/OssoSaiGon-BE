@@ -1,11 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const { renderStatisticsPage, getStatisticsData } = require("../controllers/statisticsController");
-const { protect, adminAuth } = require("../middlewares/auth");
-// Trang dashboard thống kê (hiển thị EJS)
-router.get("/",renderStatisticsPage);
+const { protect, requireRole } = require("../middlewares/auth");
 
-// API trả JSON thống kê (cho biểu đồ)
-router.get("/data", getStatisticsData);
+router.get("/", protect, requireRole("admin"), renderStatisticsPage);
+router.get("/data", protect, requireRole("admin"), getStatisticsData);
 
 module.exports = router;

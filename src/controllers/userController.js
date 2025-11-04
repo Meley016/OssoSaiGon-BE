@@ -17,7 +17,6 @@ function computeTierFromPoints(points, tiers = []) {
   const found = sorted.find(t => points >= (t.minPoints || 0));
   return found ? { tier: found.key } : { tier: sorted[sorted.length - 1].key };
 }
-
 async function deleteCloudinaryImage(url) {
   if (!url || !url.includes("/upload/")) return;
   try {
@@ -405,12 +404,12 @@ exports.updateLoyaltyConfig = async (req, res) => {
       const computed = computeTierFromPoints(before.points, tiers);
       const newTier = computed.tier || before.tier;
       if (newTier !== before.tier) {
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: u._id },
-            update: { $set: { "loyalty.tier": newTier } }
-          }
-        });
+        bulkOps.push({ 
+          updateOne: { 
+          filter: { _id: u._id }, 
+          update: { 
+          $set: { "loyalty.tier": 
+          newTier } } } });
         histories.push({
           userId: u._id,
           changeType: "apply_config",

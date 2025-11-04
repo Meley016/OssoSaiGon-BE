@@ -12,6 +12,38 @@ const Size = require("../models/Size");
 
 const { uploadImageFromURL } = require("../utils/cloudinaryHelper");
 
+exports.searchProducts = async (req, res) => {
+  try {
+    const q = req.query.q?.trim();
+    if (!q) return res.json([]);
+
+    // Dùng regex cho search chứa ký tự (case-insensitive)
+    const products = await Product.find({
+      name: { $regex: q, $options: "i" },
+      status: "active",
+    })
+      .select("name variants coverImage")
+      .limit(10)
+      .lean();
+
+    // Ghép ảnh từ variants (lấy cover hoặc ảnh đầu tiên)
+    const result = products.map((p) => ({
+      _id: p._id,
+      name: p.name,
+      image:
+        p.variants?.[0]?.coverImage ||
+        p.variants?.[0]?.images?.[0] ||
+        p.coverImage ||
+        null,
+      price: p.variants?.[0]?.price || null,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error("❌ Lỗi search:", err);
+    res.status(500).json({ error: "Lỗi khi tìm kiếm sản phẩm" });
+  }
+};
 // === HELPER FUNCTIONS ===
 const splitFiles = (files) => {
   const variantImages = {};

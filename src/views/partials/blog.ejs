@@ -1,4 +1,7 @@
 <link rel="stylesheet" href="/css/globe.css">
+<!-- Quill CSS + JS -->
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
+<script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
 
 <div class="container">
   
@@ -6,7 +9,8 @@
   <form id="blog-form" class="form-section" enctype="multipart/form-data">
     <h2 class="section-title">Quản lý Bài viết</h2>
     <div class="form-grid">
-      <div class="ant-form-item" style="grid-column: span 2;">
+      <div>
+        <div class="ant-form-item" style="grid-column: span 2;">
         <label>Tiêu đề <span class="required">*</span></label>
         <input
           type="text"
@@ -16,18 +20,6 @@
           required
         />
       </div>
-
-      <div class="ant-form-item" style="grid-column: span 2;">
-        <label>Nội dung <span class="required">*</span></label>
-        <textarea
-          name="content"
-          class="ant-input"
-          rows="5"
-          placeholder="Nhập nội dung bài viết"
-          required
-        ></textarea>
-      </div>
-
       <div class="ant-form-item" style="grid-column: span 2;">
         <label>Ảnh minh họa</label>
         <input
@@ -39,6 +31,11 @@
         />
         <small style="color:#888">Chọn 1 hoặc nhiều ảnh. Khi thay ảnh sẽ tự xóa ảnh cũ.</small>
       </div>
+      </div>
+      <div class="ant-form-item" style="grid-column: span 2;">
+        <label>Nội dung <span class="required">*</span></label>
+        <div id="editor" style="height: 250px; background: white; border: 1px solid #ccc; border-radius: 6px;"></div>
+      </div>
     </div>
 
     <div class="button-row" style="justify-content: flex-end; margin-top: 16px;">
@@ -46,6 +43,38 @@
       <button type="submit" class="btn-custom">Đăng bài</button>
     </div>
   </form>
+
+  <!-- 🟣 MODAL SỬA BLOG -->
+<div id="editModal" class="modal" style="display:none;">
+  <div class="modal-overlay" onclick="closeEditModal()"></div>
+  <div class="modal-content">
+    <h2 class="section-title">Chỉnh sửa bài viết</h2>
+    <form id="editForm" enctype="multipart/form-data">
+      <input type="hidden" id="editId" />
+
+      <div class="ant-form-item">
+        <label>Tiêu đề</label>
+        <input id="editTitle" type="text" class="ant-input" required />
+      </div>
+
+      <div class="ant-form-item">
+        <label>Ảnh minh họa</label>
+        <input id="editImages" type="file" accept="image/*" multiple class="ant-input" />
+        <div id="currentImages" style="display:flex;gap:8px;margin-top:8px;"></div>
+      </div>
+
+      <div class="ant-form-item">
+        <label>Nội dung</label>
+        <div id="editEditor" style="height:250px; background:white; border:1px solid #ccc; border-radius:6px;"></div>
+      </div>
+
+      <div class="button-row" style="justify-content: flex-end; margin-top:16px;">
+        <button type="button" class="btn-reset" onclick="closeEditModal()">Hủy</button>
+        <button type="submit" class="btn-custom">Lưu thay đổi</button>
+      </div>
+    </form>
+  </div>
+</div>
 
   <!-- DANH SÁCH BÀI VIẾT -->
   <div class="promotion-table" style="margin-top: 24px;">
@@ -71,9 +100,24 @@
 document.addEventListener("DOMContentLoaded", async () => {
   const grid = document.getElementById("blogGrid");
   const form = document.getElementById("blog-form");
-
+  const quill = new Quill('#editor', {
+    theme: 'snow',
+    placeholder: 'Nhập nội dung bài viết...',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ color: [] }, { background: [] }],
+        [{ align: [] }],
+        ['link', 'image'],
+        ['clean']
+      ],
+    },
+  });
   async function loadBlogs() {
+    const grid = document.querySelector("#blogGrid");
     grid.innerHTML = `<tr><td colspan="6" style="text-align:center;">Đang tải...</td></tr>`;
+
     try {
       const res = await fetch("/api/blogs");
       const blogs = await res.json();
@@ -83,33 +127,126 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      grid.innerHTML = blogs.map((b, i) => `
-        <tr>
-          <td>${i + 1}</td>
-          <td>
-            ${b.images?.[0]
-              ? `<img src="${b.images[0]}" alt="${b.title}" style="width:70px;height:70px;object-fit:cover;border-radius:4px;">`
-              : `<div class="no-img">Không có</div>`
-            }
-          </td>
-          <td>${b.title}</td>
-          <td>${b.content.length > 60 ? b.content.slice(0, 60) + "..." : b.content}</td>
-          <td>${new Date(b.createdAt).toLocaleDateString()}</td>
-          <td>
-            <button class="btn-edit" onclick="editBlog('${b._id}', '${b.title}', \`${b.content.replace(/`/g, "\\`")}\`)">Sửa</button>
-            <button class="btn-delete" onclick="deleteBlog('${b._id}')">Xóa</button>
-          </td>
-        </tr>
-      `).join("");
+      grid.innerHTML = blogs.map((b, i) => {
+        // 🔒 Escape dữ liệu để không bị vỡ HTML
+        const safeTitle = b.title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const safeContent = encodeURIComponent(b.content);
+
+        return `
+          <tr>
+            <td>${i + 1}</td>
+            <td>
+              ${
+                b.images?.[0]
+                  ? `<img src="${b.images[0]}" alt="${b.title}" style="width:70px;height:70px;object-fit:cover;border-radius:4px;">`
+                  : `<div class="no-img">Không có</div>`
+              }
+            </td>
+            <td>${b.title}</td>
+            <td>${b.content.length > 60 ? b.content.slice(0, 60) + "..." : b.content}</td>
+            <td>${new Date(b.createdAt).toLocaleDateString()}</td>
+            <td>
+              <button 
+                class="btn-edit" 
+                onclick="editBlog('${b._id}', '${safeTitle}', decodeURIComponent('${safeContent}'))">
+                Sửa
+              </button>
+              <button class="btn-delete" onclick="deleteBlog('${b._id}')">Xóa</button>
+            </td>
+          </tr>
+        `;
+      }).join("");
     } catch (err) {
       console.error(err);
       grid.innerHTML = `<tr><td colspan="6" style="text-align:center;color:red;">Lỗi tải bài viết.</td></tr>`;
     }
   }
 
+  let editQuill; // Editor riêng cho modal sửa
+
+  window.editBlog = async (id, title, content) => {
+    console.log("📝 Sửa bài:", id);
+
+    const modal = document.getElementById("editModal");
+    const form = document.getElementById("editForm");
+    const currentImages = document.getElementById("currentImages");
+
+    // Gán dữ liệu
+    document.getElementById("editId").value = id;
+    document.getElementById("editTitle").value = title;
+
+    // Xóa editor cũ nếu có
+    if (editQuill) editQuill.root.innerHTML = "";
+    // Tạo lại Quill nếu chưa có
+    if (!editQuill) {
+      editQuill = new Quill("#editEditor", {
+        theme: "snow",
+        modules: {
+          toolbar: [
+            [{ header: [1, 2, 3, false] }],
+            ["bold", "italic", "underline", "strike"],
+            [{ color: [] }, { background: [] }],
+            [{ align: [] }],
+            ["link", "image"],
+            ["clean"],
+          ],
+        },
+      });
+    }
+
+    // ⚙️ Load dữ liệu blog thật từ server (để đảm bảo đầy đủ ảnh + HTML content)
+    try {
+      const res = await fetch(`/api/blogs/${id}`);
+      if (!res.ok) throw new Error("Không thể tải dữ liệu bài viết.");
+      const blog = await res.json();
+
+      // Set nội dung chính xác (HTML)
+      editQuill.root.innerHTML = blog.content || "";
+
+      // Ảnh hiện tại
+      currentImages.innerHTML = blog.images
+        ?.map(img => `<img src="${img}" style="width:80px;height:80px;object-fit:cover;">`)
+        .join("") || "";
+
+      // Hiện modal
+      modal.style.display = "flex";
+    } catch (err) {
+      showToast("error", err.message);
+    }
+
+    // Submit form sửa
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const formData = new FormData();
+      formData.append("title", document.getElementById("editTitle").value);
+      formData.append("content", editQuill.root.innerHTML);
+
+      const images = document.getElementById("editImages").files;
+      for (const img of images) formData.append("blogImages", img);
+
+      try {
+        const res = await fetch(`/api/blogs/${id}`, {
+          method: "PUT",
+          body: formData,
+        });
+        if (!res.ok) throw new Error("Lỗi cập nhật bài viết");
+        showToast("success", "✅ Cập nhật thành công!");
+        modal.style.display = "none";
+        loadBlogs();
+      } catch (err) {
+        showToast("error", err.message);
+      }
+    };
+  };
+
+  window.closeEditModal = () => {
+    document.getElementById("editModal").style.display = "none";
+  };
+
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const formData = new FormData(form);
+    formData.set("content", quill.root.innerHTML);
     try {
       const res = await fetch("/api/blogs", { method: "POST", body: formData });
       if (!res.ok) throw new Error("Lỗi đăng bài");

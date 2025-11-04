@@ -1,20 +1,17 @@
-// src/routes/products.js
 const express = require("express");
 const router = express.Router();
-
-const upload = require("../middlewares/uploadImagesCloudinary"); 
+const upload = require("../middlewares/uploadImagesCloudinary");
 const uploadCSV = require("../middlewares/upload");
-
+const { protect, requireRole } = require("../middlewares/auth");
 const productController = require("../controllers/productController");
 
-console.log("upload type:", typeof upload); 
-
 router.get("/", productController.getAllProducts);
+router.get("/search", productController.searchProducts);
 router.get("/:id", productController.getProductById);
-router.post("/", upload, productController.createProduct); 
-router.put("/:id", upload, productController.updateProduct);
 
-router.delete("/:id", productController.deleteProduct);
-router.post("/import", uploadCSV.single("csvFile"), productController.importProducts);
+router.post("/", protect, requireRole("productAdder", "admin"), upload, productController.createProduct);
+router.put("/:id", protect, requireRole("productAdder", "admin"), upload, productController.updateProduct);
+router.delete("/:id", protect, requireRole("productAdder", "admin"), productController.deleteProduct);
+router.post("/import", protect, requireRole("productAdder", "admin"), uploadCSV.single("csvFile"), productController.importProducts);
 
 module.exports = router;

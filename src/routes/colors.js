@@ -1,14 +1,11 @@
-// routes/colors.js
 const express = require("express");
 const router = express.Router();
 const colorController = require("../controllers/colorController");
+const { protect, requireRole } = require("../middlewares/auth");
 
-// GET
 router.get("/", colorController.getAllColors);
-
-// CRUD
-router.post("/", colorController.createColor);
-router.put("/:id", colorController.updateColor);
-router.delete("/:id", colorController.deleteColor);
+router.post("/", protect, requireRole("productAdder", "admin"), colorController.createColor);
+router.put("/:id", protect, requireRole("productAdder", "admin"), colorController.updateColor);
+router.delete("/:id", protect, requireRole("productAdder", "admin"), colorController.deleteColor);
 
 module.exports = router;

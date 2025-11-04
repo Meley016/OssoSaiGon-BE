@@ -56,7 +56,7 @@ const userSchema = new mongoose.Schema(
     birthday: { type: Date },
     address: { type: String, trim: true },
 
-    role: { type: String, enum: ["user", "admin"], default: "user" },
+    role: { type: String, enum: ["user", "admin", "writer", "productAdder"], default: "user" },
 
     loyalty: { type: loyaltySchema, default: () => ({}) },
 
