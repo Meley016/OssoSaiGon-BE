@@ -12,31 +12,75 @@ const Size = require("../models/Size");
 
 const { uploadImageFromURL } = require("../utils/cloudinaryHelper");
 
+// === SEARCH PRODUCTS ===
 exports.searchProducts = async (req, res) => {
   try {
     const q = req.query.q?.trim();
     if (!q) return res.json([]);
 
-    // Dùng regex cho search chứa ký tự (case-insensitive)
-    const products = await Product.find({
-      name: { $regex: q, $options: "i" },
-      status: "active",
-    })
+    // ⚡ Ưu tiên dùng text index nếu có (nhanh hơn nhiều so với regex)
+    const query = q.length > 2
+      ? { $text: { $search: q }, status: "active" }
+      : { name: { $regex: q, $options: "i" }, status: "active" };
+
+    const products = await Product.find(query)
+      .populate("variants.color", "name code")
+      .populate("variants.size", "name code")
       .select("name variants coverImage")
       .limit(10)
       .lean();
 
-    // Ghép ảnh từ variants (lấy cover hoặc ảnh đầu tiên)
-    const result = products.map((p) => ({
-      _id: p._id,
-      name: p.name,
-      image:
-        p.variants?.[0]?.coverImage ||
-        p.variants?.[0]?.images?.[0] ||
+    const result = products.map((p) => {
+      // ✅ Lọc variant hợp lệ
+      const validVariants = (p.variants || []).filter(
+        (v) =>
+          v &&
+          typeof v.price === "number" &&
+          !isNaN(v.price) &&
+          v.price > 0 &&
+          v.color &&
+          v.size
+      );
+
+      // ✅ Giá trị mặc định
+      let minPrice = 0;
+      let maxPrice = 0;
+      if (validVariants.length > 0) {
+        const prices = validVariants.map((v) => v.price);
+        minPrice = Math.min(...prices);
+        maxPrice = Math.max(...prices);
+      }
+
+      // ✅ Tập hợp màu và size duy nhất
+      const colors = [
+        ...new Map(
+          validVariants.map((v) => [v.color._id.toString(), v.color])
+        ).values(),
+      ];
+
+      const sizes = [
+        ...new Map(
+          validVariants.map((v) => [v.size._id.toString(), v.size])
+        ).values(),
+      ];
+
+      // ✅ Ảnh đại diện ưu tiên: coverImage > variant cover > variant images
+      const coverImage =
         p.coverImage ||
-        null,
-      price: p.variants?.[0]?.price || null,
-    }));
+        validVariants[0]?.coverImage ||
+        validVariants[0]?.images?.[0] ||
+        "/imgs/placeholder.jpg";
+
+      return {
+        _id: p._id,
+        name: p.name,
+        coverImage,
+        minPrice,
+        maxPrice,
+        colors,
+        sizes,
+      };
+    });
 
     res.json(result);
   } catch (err) {
