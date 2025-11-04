@@ -1,39 +1,42 @@
-// src/utils/email.js
 const nodemailer = require("nodemailer");
+const fs = require("fs");
+const path = require("path");
 
-// SỬA: DÙNG createTransport() – ĐÚNG CÁCH NODemailer v7+
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: Number(process.env.EMAIL_PORT) || 587,
-  secure: process.env.EMAIL_SECURE === "true", // false cho 587
-  ignoreTLS: true,
-    auth: {
-    user: process.env.EMAIL_USER,
+  host: process.env.EMAIL_HOST || "smtp.gmail.com",
+  port: process.env.EMAIL_PORT || 465,
+  secure: true,
+  auth: {
+    user: process.env.EMAIL_SENDER,
     pass: process.env.EMAIL_PASS,
   },
 });
 
-// Test transporter (tùy chọn)
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("Transporter config error:", error);
-  } else {
-    console.log("Email transporter ready!");
+// === Hàm render HTML template ===
+function renderTemplate(templateName, variables) {
+  const filePath = path.join(__dirname, "../templates", `${templateName}.html`);
+  let html = fs.readFileSync(filePath, "utf8");
+  for (const [key, value] of Object.entries(variables)) {
+    html = html.replace(new RegExp(`{{${key}}}`, "g"), value);
   }
-});
+  return html;
+}
 
-async function sendEmail({ to, subject, html }) {
+// === Hàm gửi email ===
+async function sendEmail({ to, subject, templateName, variables }) {
+  const html = renderTemplate(templateName, variables);
+
   try {
     const info = await transporter.sendMail({
-      from: `"Osso Saigon" <${process.env.EMAIL_USER}>`,
+      from: `"Osso Saigon" <${process.env.EMAIL_SENDER}>`,
       to,
       subject,
       html,
     });
-    console.log(`Email sent to ${to} | ID: ${info.messageId}`);
-  } catch (err) {
-    console.error("Send email failed:", err);
-    throw new Error("Không thể gửi email xác nhận");
+    console.log(`✅ Đã gửi email tới ${to}: ${info.messageId}`);
+  } catch (error) {
+    console.error("❌ Gửi email thất bại:", error);
+    throw new Error("Không thể gửi email");
   }
 }
 

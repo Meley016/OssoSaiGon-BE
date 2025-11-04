@@ -171,7 +171,8 @@ exports.updateMe = async (req, res) => {
     // === EMAIL MỚI ===
     if (req.body.email && req.body.email !== user.email) {
       const emailExists = await User.findOne({ email: req.body.email });
-      if (emailExists) return res.status(400).json({ error: "Email đã được sử dụng" });
+      if (emailExists)
+        return res.status(400).json({ error: "Email đã được sử dụng" });
 
       const emailToken = crypto.randomBytes(32).toString("hex");
       const emailTokenExpire = Date.now() + 15 * 60 * 1000;
@@ -184,15 +185,12 @@ exports.updateMe = async (req, res) => {
       await sendEmail({
         to: req.body.email,
         subject: "Xác nhận thay đổi email - Osso Saigon",
-        html: `
-          <h3>Xin chào ${user.name},</h3>
-          <p>Bạn đã yêu cầu thay đổi email thành: <strong>${req.body.email}</strong></p>
-          <p>Nhấn vào nút để xác nhận:</p>
-          <a href="${confirmUrl}" style="background:#1677ff;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">
-            Xác nhận Email
-          </a>
-          <p>Hết hạn sau 15 phút.</p>
-        `,
+        templateName: "verifyEmail",
+        variables: {
+          name: user.name,
+          email: req.body.email,
+          link: confirmUrl,
+        },
       });
     }
 
@@ -201,7 +199,7 @@ exports.updateMe = async (req, res) => {
       const passwordToken = crypto.randomBytes(32).toString("hex");
       const passwordTokenExpire = Date.now() + 15 * 60 * 1000;
 
-      user.passwordPending = req.body.password; // lưu tạm (sẽ hash ở pre-save)
+      user.passwordPending = req.body.password;
       user.passwordToken = passwordToken;
       user.passwordTokenExpire = passwordTokenExpire;
 
@@ -209,15 +207,12 @@ exports.updateMe = async (req, res) => {
       await sendEmail({
         to: user.email,
         subject: "Xác nhận đổi mật khẩu - Osso Saigon",
-        html: `
-          <h3>Xin chào ${user.name},</h3>
-          <p>Bạn đã yêu cầu đổi mật khẩu.</p>
-          <p>Nhấn vào nút để xác nhận:</p>
-          <a href="${confirmUrl}" style="background:#52c41a;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">
-            Xác nhận Đổi Mật Khẩu
-          </a>
-          <p>Hết hạn sau 15 phút.</p>
-        `,
+        templateName: "resetPassword",
+        variables: {
+          name: user.name,
+          email: user.email,
+          link: confirmUrl,
+        },
       });
     }
 
@@ -235,9 +230,10 @@ exports.updateMe = async (req, res) => {
     res.json({
       success: true,
       data: safe,
-      message: req.body.email || req.body.password
-        ? "Vui lòng kiểm tra email để xác nhận thay đổi."
-        : "Cập nhật thành công!",
+      message:
+        req.body.email || req.body.password
+          ? "Vui lòng kiểm tra email để xác nhận thay đổi."
+          : "Cập nhật thành công!",
     });
   } catch (err) {
     console.error("updateMe error:", err);
