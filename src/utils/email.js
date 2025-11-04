@@ -1,16 +1,6 @@
-const nodemailer = require("nodemailer");
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
-
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || "smtp.gmail.com",
-  port: process.env.EMAIL_PORT || 465,
-  secure: true,
-  auth: {
-    user: process.env.EMAIL_SENDER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 // === Hàm render HTML template ===
 function renderTemplate(templateName, variables) {
@@ -22,20 +12,33 @@ function renderTemplate(templateName, variables) {
   return html;
 }
 
-// === Hàm gửi email ===
+// === Gửi email qua Brevo API ===
 async function sendEmail({ to, subject, templateName, variables }) {
   const html = renderTemplate(templateName, variables);
 
   try {
-    const info = await transporter.sendMail({
-      from: `"Osso Saigon" <${process.env.EMAIL_SENDER}>`,
-      to,
-      subject,
-      html,
-    });
-    console.log(`✅ Đã gửi email tới ${to}: ${info.messageId}`);
+    const res = await axios.post(
+      "https://api.brevo.com/v3/smtp/email",
+      {
+        sender: {
+          name: process.env.BREVO_NAME || "Osso Saigon",
+          email: process.env.BREVO_SENDER,
+        },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      },
+      {
+        headers: {
+          "api-key": process.env.BREVO_API_KEY,
+          "content-type": "application/json",
+        },
+      }
+    );
+
+    console.log(`✅ Email gửi thành công tới ${to}`);
   } catch (error) {
-    console.error("❌ Gửi email thất bại:", error);
+    console.error("❌ Lỗi gửi email qua Brevo:", error.response?.data || error.message);
     throw new Error("Không thể gửi email");
   }
 }
