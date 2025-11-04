@@ -11,8 +11,16 @@ const blogSchema = new mongoose.Schema(
     title: { type: String, required: true },
     content: { type: String, required: true },
     images: [{ type: String }], // danh sách ảnh Cloudinary
-    likes: { type: Number, default: 0 },
-    comments: [commentSchema],
+    likes: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "User",
+      default: [], // ✅ đảm bảo không bị undefined khi findIndex
+    },
+
+    comments: {
+      type: [commentSchema],
+      default: [], // ✅ đảm bảo luôn có mảng
+    },
   },
   { timestamps: true }
 );

@@ -1,15 +1,16 @@
-// routes/categories.js
 const express = require("express");
 const router = express.Router();
 const categoryController = require("../controllers/categoryController");
 const upload = require("../middlewares/uploadImagesCloudinary");
-// GET
+const { protect, requireRole } = require("../middlewares/auth");
+
 router.get("/", categoryController.getAllCategories);
 router.get("/:id", categoryController.getCategoryById);
-// CRUD
-router.post("/", upload, categoryController.createCategory);
-router.put("/:id", upload, categoryController.updateCategory);
-router.delete("/:id", categoryController.deleteCategory);
+
+router.post("/", protect, requireRole("productAdder", "admin"), upload, categoryController.createCategory);
+router.put("/:id", protect, requireRole("productAdder", "admin"), upload, categoryController.updateCategory);
+router.delete("/:id", protect, requireRole("productAdder", "admin"), categoryController.deleteCategory);
+
 router.get("/check/:id", async (req, res) => {
   try {
     const count = await Product.countDocuments({ category: req.params.id });

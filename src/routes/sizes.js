@@ -1,14 +1,11 @@
-// routes/sizes.js
 const express = require("express");
 const router = express.Router();
 const sizeController = require("../controllers/sizeController");
+const { protect, requireRole } = require("../middlewares/auth");
 
-// GET
 router.get("/", sizeController.getAllSizes);
-
-// CRUD
-router.post("/", sizeController.createSize);
-router.put("/:id", sizeController.updateSize);
-router.delete("/:id", sizeController.deleteSize);
+router.post("/", protect, requireRole("productAdder", "admin"), sizeController.createSize);
+router.put("/:id", protect, requireRole("productAdder", "admin"), sizeController.updateSize);
+router.delete("/:id", protect, requireRole("productAdder", "admin"), sizeController.deleteSize);
 
 module.exports = router;

@@ -22,10 +22,13 @@ const productSchema = new mongoose.Schema(
     brand: { type: String },
     description: { type: String },
     variants: [variantSchema],
+    
     status: { type: String, enum: ["active", "inactive"], default: "active" }
   },
   { timestamps: true }
 );
+
+productSchema.index({ name: "text" });
 
 // Unique SKU theo từng product group
 productSchema.index({ groupId: 1, "variants.sku": 1 }, { unique: true, sparse: true });
