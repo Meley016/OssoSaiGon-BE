@@ -1,40 +1,73 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
-<link rel="stylesheet" href="/css/globe.css">
+<link rel="stylesheet" href="/css/globe.css" />
 
-<div class="category-container">
-  <form id="category-form" class="form-section" enctype="multipart/form-data">
-      <h2 class="section-title">Quản lý Danh mục</h2>
+<div class="category-container form-section">
+  <h2 class="section-title">Quản lý Danh mục</h2>
 
-    <div class="form-grid">
-      <input type="text" name="name" placeholder="Tên danh mục" class="input-field" required />
-      <textarea name="description" placeholder="Mô tả (tùy chọn)" class="input-field" rows="2"></textarea>
-      <input type="file" name="categoryImage" accept="image/*" class="input-field" />
-    </div>
-    <div class="button-row">
-      <button type="submit" class="btn-custom">Tạo Danh mục</button>
-      <button type="reset" class="btn-reset">Đặt lại</button>
-    </div>
-  </form>
+  <!-- 🟢 Tabs -->
+  <div class="tab-header">
+    <button class="tab-btn active" onclick="switchTab('main')">Danh mục lớn</button>
+    <button class="tab-btn" onclick="switchTab('category')">Danh mục con</button>
+  </div>
 
-  <div class="item-grid" id="categoryGrid"></div>
+  <!-- 🟢 MAIN CATEGORY -->
+  <div id="mainTab" class="tab-content active">
+    <form id="main-form" class="form-section" enctype="multipart/form-data">
+      <div class="form-grid">
+        <input type="text" name="name" placeholder="Tên danh mục lớn" class="input-field" required />
+        <textarea name="description" placeholder="Mô tả (tùy chọn)" class="input-field" rows="2"></textarea>
+      </div>
+      <div class="button-row">
+        <button type="submit" class="btn-custom">Tạo danh mục lớn</button>
+        <button type="reset" class="btn-reset">Đặt lại</button>
+      </div>
+    </form>
+    <div class="item-grid" id="mainGrid"></div>
+  </div>
+
+  <!-- 🟢 SUB CATEGORY -->
+  <div id="categoryTab" class="tab-content">
+    <form id="category-form" class="form-section" enctype="multipart/form-data">
+      <div class="form-grid">
+        <input type="text" name="name" placeholder="Tên danh mục" class="input-field" required />
+        <textarea name="description" placeholder="Mô tả (tùy chọn)" class="input-field" rows="2"></textarea>
+        <select name="mainCategory" id="mainCategorySelect" class="input-field" required>
+          <option value="">-- Chọn danh mục lớn --</option>
+        </select>
+        <input type="file" name="categoryImage" accept="image/*" class="input-field" />
+      </div>
+      <div class="button-row">
+        <button type="submit" class="btn-custom">Tạo Danh mục</button>
+        <button type="reset" class="btn-reset">Đặt lại</button>
+      </div>
+    </form>
+    <div class="item-grid" id="categoryGrid"></div>
+  </div>
 </div>
 
-<!-- EDIT MODAL -->
+<!-- 🟣 EDIT MODAL -->
 <div id="editModal" class="modal" enctype="multipart/form-data">
   <div class="modal-content">
     <span class="modal-close" onclick="closeEditModal()">&times;</span>
-    <h3>Sửa Danh mục</h3>
+    <h3 id="edit-title">Sửa Danh mục</h3>
     <form id="edit-form">
       <input type="hidden" id="edit-id" name="id" />
       <div class="form-grid">
         <input type="text" id="edit-name" name="name" placeholder="Tên danh mục" class="ant-input" required />
         <textarea id="edit-description" name="description" placeholder="Mô tả" class="ant-input" rows="2"></textarea>
-        <input type="file" name="categoryImage" accept="image/*" class="input-field" />
+
+        <!-- 🆕 Dropdown gắn hoặc đổi danh mục lớn -->
+        <select id="edit-mainCategory" name="mainCategory" class="input-field" style="display:none;">
+          <option value="">-- Chọn danh mục lớn --</option>
+        </select>
       </div>
+
       <div id="edit-preview" style="margin-top:8px;text-align:center;display:none;">
-        <img id="edit-img" src="" alt="preview" style="width:40%;height:40%;object-fit:cover;border-radius:8px;border:1px solid #eee;" />
+        <img id="edit-img" src="" alt="preview"
+          style="width:40%;height:40%;object-fit:cover;border-radius:8px;border:1px solid #eee;" />
       </div>
+
       <div class="modal-actions">
         <button type="button" class="btn-delete" onclick="closeEditModal()">Hủy</button>
         <button type="submit" class="btn-edit">Cập nhật</button>
@@ -43,7 +76,7 @@
   </div>
 </div>
 
-<!-- 🟥 MODAL XÁC NHẬN / CẢNH BÁO -->
+<!-- 🟥 DELETE MODAL -->
 <div id="deleteModal" class="modal">
   <div class="modal-content" style="max-width:400px;text-align:center;">
     <h3 id="delete-title">Xác nhận xóa</h3>
@@ -57,126 +90,154 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
-  const grid = document.getElementById("categoryGrid");
+  const mainGrid = document.getElementById("mainGrid");
+  const categoryGrid = document.getElementById("categoryGrid");
+  const mainSelect = document.getElementById("mainCategorySelect");
+  const editMainSelect = document.getElementById("edit-mainCategory");
   const deleteModal = document.getElementById("deleteModal");
   const deleteMsg = document.getElementById("delete-message");
   const deleteTitle = document.getElementById("delete-title");
   const confirmBtn = document.getElementById("confirmDeleteBtn");
-  let deleteTargetId = null;
+  let deleteTargetId = null, deleteType = null;
 
-  async function loadCategories() {
-    try {
-      const res = await fetch("/api/categories");
-      if (!res.ok) throw new Error("Không thể tải danh mục");
-      const categories = await res.json();
+  // 🟩 Switch tab
+  window.switchTab = (tab) => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add("active");
+    document.getElementById(tab + "Tab").classList.add("active");
+  };
 
-      grid.innerHTML = categories.length
-        ? categories.map(cat => `
-          <div class="size-card">
-            ${cat.image ? `<img src="${cat.image}" alt="${cat.name}" style="width:100%;height:150px;object-fit:cover;border-radius:8px;margin-bottom:6px;">` : ""}
-            <h4>${cat.name}</h4>
-            <p><strong>Mô tả:</strong> ${cat.description || 'Không có'}</p>
-            <p><small>${new Date(cat.createdAt).toLocaleDateString()}</small></p>
-            <div style="margin-top: 12px;">
-              <button class="btn btn-edit" onclick="editCategory('${cat._id}', '${cat.name}', \`${cat.description || ''}\`, '${cat.image || ''}')">Sửa</button>
-              <button class="btn btn-delete" onclick="checkBeforeDelete('${cat._id}')">Xóa</button>
-            </div>
-          </div>
-        `).join("")
-        : '<p style="text-align:center;padding:20px;">Chưa có danh mục nào.</p>';
-    } catch (error) {
-      grid.innerHTML = `<p class="error-text">Lỗi: ${error.message}</p>`;
-    }
+  // 🟩 Load danh mục lớn
+  async function loadMainCategories() {
+    const res = await fetch("/api/main-categories");
+    const mains = await res.json();
+    mainGrid.innerHTML = mains.length ? mains.map(m => `
+      <div class="size-card">
+        ${m.image ? `<img src="${m.image}" alt="${m.name}" class="thumb">` : ""}
+        <h4>${m.name}</h4>
+        <p>${m.description || "Không có mô tả"}</p>
+        <div class="actions">
+          <button class="btn-edit" onclick="editItem('main','${m._id}','${m.name}','${m.description || ''}','${m.image || ''}')">Sửa</button>
+          <button class="btn-delete" onclick="confirmDelete('main','${m._id}')">Xóa</button>
+        </div>
+      </div>
+    `).join("") : `<p>Chưa có danh mục lớn nào.</p>`;
+    mainSelect.innerHTML = '<option value="">-- Chọn danh mục lớn --</option>' +
+      mains.map(m => `<option value="${m._id}">${m.name}</option>`).join("");
   }
 
-  // 🟢 CREATE
-  document.getElementById("category-form").addEventListener("submit", async e => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const name = formData.get('name').trim();
-    if (!name) return alert("Tên danh mục không được để trống!");
-    try {
-      const res = await fetch("/api/categories", { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Thêm thất bại");
-      alert("Thêm danh mục thành công!");
-      e.target.reset();
-      loadCategories();
-    } catch (err) {
-      alert("Lỗi: " + err.message);
-    }
-  });
+  // 🟩 Load danh mục con
+  async function loadCategories() {
+    const res = await fetch("/api/categories");
+    const cats = await res.json();
+    categoryGrid.innerHTML = cats.length ? cats.map(cat => `
+      <div class="size-card">
+        ${cat.image ? `<img src="${cat.image}" alt="${cat.name}" class="thumb">` : ""}
+        <h4>${cat.name}</h4>
+        <p><strong>Mô tả:</strong> ${cat.description || "Không có"}</p>
+        <p><strong>Danh mục lớn:</strong> ${cat.mainCategory?.name || "Chưa gắn"}</p>
+        <div class="actions">
+          <button class="btn-edit" onclick="editItem('category','${cat._id}','${cat.name}','${cat.description || ''}','${cat.image || ''}','${cat.mainCategory?._id || ''}')">Sửa</button>
+          <button class="btn-delete" onclick="confirmDelete('category','${cat._id}')">Xóa</button>
+        </div>
+      </div>
+    `).join("") : `<p>Chưa có danh mục con nào.</p>`;
+  }
 
-  // 🟡 EDIT
-  window.editCategory = (id, name, description, image) => {
-    document.getElementById('edit-id').value = id;
-    document.getElementById('edit-name').value = name;
-    document.getElementById('edit-description').value = description;
-    const preview = document.getElementById('edit-preview');
-    const img = document.getElementById('edit-img');
-    if (image) { img.src = image; preview.style.display = "block"; }
-    else { preview.style.display = "none"; img.src = ""; }
-    document.getElementById('editModal').style.display = 'block';
+  async function loadEditMainSelect(selectedId = "") {
+    const res = await fetch("/api/main-categories");
+    const mains = await res.json();
+    editMainSelect.innerHTML = '<option value="">-- Chọn danh mục lớn --</option>' +
+      mains.map(m => `<option value="${m._id}" ${m._id === selectedId ? "selected" : ""}>${m.name}</option>`).join("");
+  }
+
+  // 🟩 Create Main
+  document.getElementById("main-form").onsubmit = async e => {
+    e.preventDefault();
+    const form = new FormData(e.target);
+    await fetch("/api/main-categories", { method: "POST", body: form });
+    e.target.reset();
+    loadMainCategories();
   };
 
-  document.getElementById("edit-form").addEventListener("submit", async e => {
+  // 🟩 Create Category
+  document.getElementById("category-form").onsubmit = async e => {
     e.preventDefault();
-    const formData = new FormData(e.target);
-    const id = formData.get("id");
-    try {
-      const res = await fetch(`/api/categories/${id}`, { method: "PUT", body: formData });
-      if (!res.ok) throw new Error("Cập nhật thất bại");
-      alert("Cập nhật thành công!");
-      closeEditModal();
-      loadCategories();
-    } catch (err) {
-      alert("Lỗi: " + err.message);
-    }
-  });
-
-  // 🔴 DELETE — kiểm tra phụ thuộc sản phẩm trước
-  window.checkBeforeDelete = async (id) => {
-    try {
-      const res = await fetch(`/api/categories/check/${id}`);
-      const data = await res.json();
-
-      deleteTargetId = id;
-      deleteModal.style.display = "block";
-
-      if (data.hasProducts) {
-        deleteTitle.textContent = "Không thể xóa danh mục";
-        deleteMsg.innerHTML = "Danh mục này đang được liên kết với sản phẩm, không thể xóa.";
-        confirmBtn.style.display = "none";
-      } else {
-        deleteTitle.textContent = "Xác nhận xóa danh mục";
-        deleteMsg.innerHTML = "Bạn có chắc muốn xóa danh mục này không?";
-        confirmBtn.style.display = "inline-block";
-      }
-    } catch (err) {
-      alert("Lỗi kiểm tra: " + err.message);
-    }
+    const form = new FormData(e.target);
+    await fetch("/api/categories", { method: "POST", body: form });
+    e.target.reset();
+    loadCategories();
   };
 
-  confirmBtn.addEventListener("click", async () => {
-    if (!deleteTargetId) return;
-    try {
-      const res = await fetch(`/api/categories/${deleteTargetId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Xóa thất bại");
-      alert("Xóa thành công!");
-      closeDeleteModal();
-      loadCategories();
-    } catch (err) {
-      alert("Lỗi: " + err.message);
-    }
-  });
+  // 🟩 Edit
+  window.editItem = async (type, id, name, description, image, mainCategoryId) => {
+    deleteType = type;
+    document.getElementById("edit-id").value = id;
+    document.getElementById("edit-title").textContent = type === "main" ? "Sửa Danh mục lớn" : "Sửa Danh mục con";
+    document.getElementById("edit-name").value = name;
+    document.getElementById("edit-description").value = description;
+    const img = document.getElementById("edit-img");
+    const preview = document.getElementById("edit-preview");
+    if (image) { img.src = image; preview.style.display = "block"; } else preview.style.display = "none";
 
-  // ⚙️ Modal helpers
-  window.closeEditModal = () => document.getElementById('editModal').style.display = 'none';
-  window.closeDeleteModal = () => deleteModal.style.display = 'none';
-  window.onclick = (e) => {
-    if (e.target === document.getElementById('editModal')) closeEditModal();
+    // Hiện dropdown nếu là danh mục con
+    if (type === "category") {
+      editMainSelect.style.display = "block";
+      await loadEditMainSelect(mainCategoryId);
+    } else {
+      editMainSelect.style.display = "none";
+    }
+
+    document.getElementById("editModal").style.display = "block";
+  };
+
+  // 🟩 Submit Edit
+  document.getElementById("edit-form").onsubmit = async e => {
+    e.preventDefault();
+    const form = new FormData(e.target);
+    const id = form.get("id");
+    const url = deleteType === "main" ? `/api/main-categories/${id}` : `/api/categories/${id}`;
+    await fetch(url, { method: "PUT", body: form });
+    closeEditModal();
+    deleteType === "main" ? loadMainCategories() : loadCategories();
+  };
+
+  // 🟩 Delete
+  window.confirmDelete = (type, id) => {
+    deleteTargetId = id;
+    deleteType = type;
+    deleteTitle.textContent = "Xác nhận xóa";
+    deleteMsg.innerHTML = `Bạn có chắc muốn xóa ${type === 'main' ? 'danh mục lớn' : 'danh mục'} này không?`;
+    deleteModal.style.display = "block";
+  };
+
+  confirmBtn.onclick = async () => {
+    const url = deleteType === "main" ? `/api/main-categories/${deleteTargetId}` : `/api/categories/${deleteTargetId}`;
+    await fetch(url, { method: "DELETE" });
+    closeDeleteModal();
+    deleteType === "main" ? loadMainCategories() : loadCategories();
+  };
+
+  window.closeEditModal = () => document.getElementById("editModal").style.display = "none";
+  window.closeDeleteModal = () => deleteModal.style.display = "none";
+  window.onclick = e => {
+    if (e.target === document.getElementById("editModal")) closeEditModal();
     if (e.target === deleteModal) closeDeleteModal();
   };
 
-  loadCategories();
+  await loadMainCategories();
+  await loadCategories();
 });
 </script>
+
+<style>
+.tab-header { display: flex; gap: 10px; margin-bottom: 20px; }
+.tab-btn { padding: 8px 16px; border: 1px solid #ccc; background: #f6f6f6; cursor: pointer; border-radius: 6px; font-weight: 500; }
+.tab-btn.active { background: #ffe6e6; color: #000; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.thumb { width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; }
+.size-card { border: 1px solid #eee; border-radius: 8px; padding: 10px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.08); text-align: center; }
+.actions { margin-top: 10px; display: flex; justify-content: center; gap: 8px; }
+</style>
