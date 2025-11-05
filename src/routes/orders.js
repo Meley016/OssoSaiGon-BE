@@ -9,7 +9,7 @@ const { protect, apiProtect, requireRole } = require("../middlewares/auth");
 
 // // 🟢 Khi thanh toán thành công -> cập nhật order + cộng điểm loyalty
 // router.get("/vnpay-return", vnpayReturn);
-// router.post("/vnpay-ipn", vnpayIPN);
+// router.get("/vnpay-ipn", vnpayIPN);
 
 // 🧾 Client CRUD
 router.post("/", apiProtect, orderController.createOrder);
@@ -22,5 +22,10 @@ router.get("/:id", protect, requireRole("admin"), orderController.getOrderById);
 router.put("/:id", protect, requireRole("admin"), orderController.updateOrder);
 router.put("/:id/status", protect, requireRole("admin"), orderController.updateOrderStatus);
 router.delete("/:id", protect, requireRole("admin"), orderController.cancelOrder);
-
+router.get("/check-vnpay", async (req, res) => {
+  const { orderId } = req.query;
+  const order = await Order.findOne({ orderCode: orderId });
+  if (!order) return res.json({ status: "not_found" });
+  res.json({ status: order.status === "completed" ? "success" : "pending" });
+});
 module.exports = router;
