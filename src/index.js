@@ -25,7 +25,7 @@ const statisticsRoutes = require("./routes/statistics");
 const blogRoutes = require("./routes/blogs");
 const bannerRoutes = require("./routes/banner");
 const mainCategoryRoutes = require("./routes/mainCategories");
-
+const paymentRoutes = require("./routes/payment")
 // === CONTROLLER ===
 const dashboardController = require("./controllers/dashboardController");
 
@@ -118,6 +118,7 @@ app.use("/api/statistics", statisticsRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/banners", bannerRoutes); // ĐÃ SỬA: "banners" không phải "banner"
 app.use("/api/main-categories", mainCategoryRoutes);
+app.use("/api/payment", paymentRoutes);
 
 // === ADMIN ROUTES ===
 app.use("/admin", authRoutes);
