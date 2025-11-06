@@ -40,6 +40,7 @@ const PORT = process.env.PORT || 3000;
 
 // === SỬA 2: THÊM URL RENDER VÀO ALLOWED ORIGINS (ĐỂ EJS GỌI API) ===
 const allowedOrigins = [
+  "https://ososaigon.com",
   "http://localhost:5173",
   "https://ossosaigon-user.vercel.app",
   "http://localhost:3000",
