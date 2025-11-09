@@ -56,11 +56,10 @@
       <div class="form-grid">
         <input type="text" id="edit-name" name="name" placeholder="Tên danh mục" class="ant-input" required />
         <textarea id="edit-description" name="description" placeholder="Mô tả" class="ant-input" rows="2"></textarea>
-
-        <!-- 🆕 Dropdown gắn hoặc đổi danh mục lớn -->
         <select id="edit-mainCategory" name="mainCategory" class="input-field" style="display:none;">
           <option value="">-- Chọn danh mục lớn --</option>
         </select>
+        <input type="file" id="edit-image" name="categoryImage" accept="image/*" class="input-field" style="margin-top:10px;">
       </div>
 
       <div id="edit-preview" style="margin-top:8px;text-align:center;display:none;">
