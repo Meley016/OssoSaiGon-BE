@@ -10,7 +10,6 @@ const Category = require("../models/Category");
 const Color = require("../models/Color");
 const Size = require("../models/Size");
 
-const { uploadImageFromURL } = require("../utils/cloudinaryHelper");
 
 // === SEARCH PRODUCTS ===
 exports.searchProducts = async (req, res) => {
@@ -107,7 +106,6 @@ const splitFiles = (files) => {
   return { variantImages };
 };
 
-
 const fileToUrl = (file) => {
   const url = file?.path || null;
   console.log("File to URL:", file?.originalname, "->", url);
@@ -118,234 +116,6 @@ const extractPublicId = (url) => {
   if (!url) return null;
   const match = url.match(/\/v\d+\/(.+?)\.(jpg|jpeg|png|webp|gif)/);
   return match ? match[1] : null;
-};
-
-// === IMPORT CSV/XLSX ===
-exports.importProducts = async (req, res) => {
-  try {
-    console.log("Received file:", req.file?.originalname); // Debug
-    if (!req.file) {
-      return res.status(400).json({ error: "Chọn file CSV/XLSX!" });
-    }
-
-    const ext = path.extname(req.file.originalname).slice(1).toLowerCase();
-    let rows = [];
-
-    if (["xlsx", "xls"].includes(ext)) {
-      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
-    } else if (ext === "csv") {
-      const buffer = req.file.buffer;
-      const text = buffer.toString("utf8");
-      rows = await new Promise((resolve, reject) => {
-        const data = [];
-        Readable.from(text)
-          .pipe(csv())
-          .on("data", (row) => data.push(row))
-          .on("end", () => resolve(data))
-          .on("error", reject);
-      });
-    } else {
-      return res.status(400).json({ error: "Chỉ hỗ trợ .csv, .xlsx!" });
-    }
-
-    console.log("Parsed rows:", rows.length); // Debug
-    if (!rows.length) {
-      return res.status(400).json({ error: "File rỗng hoặc không đọc được!" });
-    }
-
-    const groups = {};
-    for (const r of rows) {
-      const groupId = (r.ID || "").toString().trim();
-      if (!groupId) {
-        console.log("Skipping row with empty groupId:", r); // Debug
-        continue;
-      }
-
-      let name = (r.Name || r.name || "").toString().trim();
-      const colorName = (r["Color name"] || r["color name"] || "").toString().trim();
-      const colorCode = (r["Color code"] || r["color code"] || "").toString().trim();
-      const sizeName = (r["Size name"] || r["size name"] || "").toString().trim();
-      const sizeCode = (r["Size code"] || r["size code"] || "").toString().trim();
-      if (name && colorName && sizeName) {
-        name = name.replace(new RegExp(` - ${colorName}.*`, 'i'), '').trim();
-      }
-
-      let description = (r.Description || r.description || "").toString().trim();
-      const detailsIndex = description.indexOf('**Details**');
-      if (detailsIndex !== -1) {
-        description = description.substring(0, detailsIndex).trim();
-      }
-
-      if (!groups[groupId]) {
-        groups[groupId] = {
-          groupId,
-          SKU: (r.SKU || "").toString().trim(),
-          name,
-          brand: (r.Brand || r.brand || "").toString().trim() || "Khác",
-          description,
-          categoryName: (r.Category || r.category || "").toString().trim(),
-          variants: []
-        };
-      }
-
-      const variant = {
-        colorName,
-        colorCode,
-        sizeName,
-        sizeCode,
-        price: Number(r.Price || r.price || 0),
-        quantity: Number(r.Quantity || r.Stock || r.stock || 0),
-        subImages: (r["Sub Images"] || r["sub images"] || "").toString().split(",").map(s => s.trim()).filter(Boolean)
-      };
-
-      if (variant.colorName && variant.sizeName && variant.price > 0) {
-        groups[groupId].variants.push(variant);
-      } else {
-        console.log("Skipping invalid variant:", variant); // Debug
-      }
-    }
-
-    console.log("Processed groups:", Object.keys(groups).length); // Debug
-    if (!Object.keys(groups).length) {
-      return res.status(400).json({ error: "Không có sản phẩm hợp lệ trong file!" });
-    }
-
-    const results = { created: 0, updated: 0, failed: [] };
-    const defaultColorCodeMap = {
-      "washed blue": "#94d1df",
-      "red/grey": "#988E94"
-    };
-
-    for (const groupId of Object.keys(groups)) {
-      const g = groups[groupId];
-      if (!g.variants.length) {
-        results.failed.push({ groupId, error: "Không có biến thể hợp lệ" });
-        continue;
-      }
-
-      try {
-        let category = null;
-        if (g.categoryName) {
-          category = await Category.findOne({ name: new RegExp(`^${g.categoryName}$`, 'i') });
-          if (!category) {
-            category = await Category.create({ name: g.categoryName, isActive: true });
-            console.log(`Created category: ${g.categoryName}`); // Debug
-          }
-        }
-
-        const variants = [];
-        for (const v of g.variants) {
-          const isValidHex = /^#([0-9A-F]{3}|[0-9A-F]{6})$/i.test(v.colorCode);
-          const colorCode = isValidHex ? v.colorCode : defaultColorCodeMap[v.colorName.toLowerCase()] || "#000000";
-
-          let color = await Color.findOne({ code: colorCode });
-          if (!color) {
-            color = await Color.findOne({ name: new RegExp(`^${v.colorName}$`, 'i') });
-          }
-          if (!color) {
-            if (!isValidHex && !defaultColorCodeMap[v.colorName.toLowerCase()]) {
-              results.failed.push({ groupId, error: `Màu ${v.colorName} thiếu mã hex hợp lệ` });
-              continue;
-            }
-            color = await Color.create({ name: v.colorName, code: colorCode, isActive: true });
-            console.log(`Created color: ${v.colorName}, code: ${colorCode}`); // Debug
-          }
-
-          let size = await Size.findOne({ code: v.sizeCode });
-          if (!size) {
-            size = await Size.findOne({ name: new RegExp(`^${v.sizeName}$`, 'i') });
-          }
-          if (!size) {
-            size = await Size.create({ name: v.sizeName, code: v.sizeCode, isActive: true });
-            console.log(`Created size: ${v.sizeName}, code: ${v.sizeCode}`); // Debug
-          }
-
-          const variantImages = await Promise.all(
-            v.subImages.slice(0, 6).map(url => uploadImageFromURL(url, "osso/variants"))
-          );
-          const validImages = variantImages.filter(Boolean);
-          if (!validImages.length) {
-            results.failed.push({ groupId, error: `Biến thể ${v.colorName}/${v.sizeName}: Không tải được ảnh` });
-            continue;
-          }
-          const variantCover = validImages[0] || "";
-
-          variants.push({
-            sku: `${g.SKU}-${color.name.slice(0, 3)}-${size.name}`.toUpperCase(),
-            color: color._id,
-            size: size._id,
-            stockQuantity: v.quantity,
-            price: v.price,
-            importPrice: v.price * 0.8,
-            images: validImages,
-            coverImage: variantCover
-          });
-        }
-
-        if (!variants.length) {
-          results.failed.push({ groupId, error: "Không có biến thể hợp lệ sau khi xử lý" });
-          continue;
-        }
-
-        const exist = await Product.findOne({ groupId });
-        if (exist) {
-          const existingImages = exist.variants.flatMap(v => v.images || []).filter(Boolean);
-          const newImages = variants.flatMap(v => v.images || []).filter(Boolean);
-          const imagesToDelete = existingImages.filter(img => !newImages.includes(img));
-
-          const deletePromises = imagesToDelete.map(url => {
-            const pid = extractPublicId(url);
-            if (pid) {
-              return cloudinary.uploader.destroy(pid).catch(err => {
-                console.error(`Cloudinary delete error for ${pid}:`, err);
-                return null;
-              });
-            }
-            return Promise.resolve(null);
-          });
-          await Promise.all(deletePromises);
-          console.log(`Deleted ${imagesToDelete.length} unused images for product ${groupId}`); // Debug
-
-          await Product.findByIdAndUpdate(exist._id, {
-            groupId,
-            name: g.name,
-            brand: g.brand,
-            description: g.description,
-            category: category?._id,
-            variants
-          }, { new: true });
-          results.updated++;
-          console.log(`Updated product: ${groupId}`); // Debug
-        } else {
-          await Product.create({
-            groupId,
-            name: g.name,
-            brand: g.brand,
-            description: g.description,
-            category: category?._id,
-            variants
-          });
-          results.created++;
-          console.log(`Created product: ${groupId}`); // Debug
-        }
-      } catch (err) {
-        console.error(`Error processing group ${groupId}:`, err.message); // Debug
-        results.failed.push({ groupId, error: err.message });
-      }
-    }
-
-    console.log("Import results:", results); // Debug
-    res.json({
-      success: true,
-      results,
-      message: `Tạo: ${results.created}, Cập nhật: ${results.updated}, Lỗi: ${results.failed.length}`
-    });
-  } catch (err) {
-    console.error("IMPORT ERROR:", err);
-    res.status(500).json({ error: "Import thất bại", details: err.message });
-  }
 };
 
 // === GET ALL PRODUCTS ===
@@ -434,54 +204,132 @@ exports.getProductById = async (req, res) => {
 };
 
 // === CREATE PRODUCT ===
+// exports.createProduct = async (req, res) => {
+//   try {
+//     const data = req.body;
+//     const { variantImages } = splitFiles(req.files);
+//     const variants = JSON.parse(data.variants || "[]");
+
+//     if (!variants.length) {
+//       return res.status(400).json({ error: "Cần ít nhất 1 biến thể!" });
+//     }
+
+//     // === Base folder Cloudinary (theo tên sản phẩm)
+//     const safeName = data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+//     const baseFolder = `osso/products/${safeName}`;
+
+//     // === Map lưu ảnh theo màu (upload 1 lần)
+//     const colorImageMap = {}; // { colorId: [url1, url2...] }
+
+//     for (let i = 0; i < variants.length; i++) {
+//       const v = variants[i];
+//       const files = variantImages[v.color] || [];
+
+//       // Nếu màu này chưa upload -> upload lên Cloudinary
+//       if (!colorImageMap[v.color] && files.length) {
+//         const uploadedUrls = [];
+
+//         for (const f of files) {
+//           // Nếu đã là URL Cloudinary (multer-storage-cloudinary) -> dùng luôn
+//           if (f.path && f.path.startsWith("https://res.cloudinary.com")) {
+//             uploadedUrls.push(f.path);
+//             continue;
+//           }
+
+//           // Nếu là file local (chưa upload) -> upload thủ công
+//           const uploadRes = await cloudinary.uploader.upload(f.path, {
+//             folder: `${baseFolder}/${v.color}`,
+//             unique_filename: true,
+//             overwrite: false,
+//           });
+//           uploadedUrls.push(uploadRes.secure_url);
+//         }
+
+//       } else if (!files.length && !colorImageMap[v.color]) {
+//         // ❌ BỎ: return lỗi này, vì import có thể không có ảnh upload
+//         // return res.status(400).json({ error: `Biến thể ${i + 1} thiếu ảnh!` });
+//         console.warn(`⚠️ Biến thể ${i + 1} chưa có ảnh upload — bỏ qua.`);
+//       }
+//     }
+
+//     // === Gán ảnh chung cho các variant cùng màu
+//     const finalVariants = [];
+//     for (const v of variants) {
+//       const color = await Color.findById(v.color);
+//       const size = await Size.findById(v.size);
+//       if (!color || !size) continue;
+
+//       const sharedImages = colorImageMap[v.color] || [];
+//       if (!sharedImages.length) continue;
+
+//       finalVariants.push({
+//         sku: `${data.SKU}-${color.name}-${size.name}`.toUpperCase(),
+//         color: v.color,
+//         size: v.size,
+//         price: Number(v.price),
+//         stockQuantity: Number(v.stock),
+//         importPrice: Number(v.price) * 0.8,
+//         images: sharedImages,
+//         coverImage: sharedImages[0],
+//       });
+//     }
+
+//     // === Tạo sản phẩm
+//     const product = await Product.create({
+//       groupId: data.SKU,
+//       name: data.name,
+//       category: data.category,
+//       brand: data.brand,
+//       description: data.description,
+//       variants: finalVariants,
+//     });
+
+//     const populated = await Product.findById(product._id)
+//       .populate("category", "name")
+//       .populate("variants.color", "name code")
+//       .populate("variants.size", "name code")
+//       .lean();
+
+//     res.status(201).json(populated);
+//   } catch (err) {
+//     console.error("CREATE ERROR:", err);
+//     res.status(500).json({ error: "Lỗi tạo sản phẩm", details: err.message });
+//   }
+// };
 exports.createProduct = async (req, res) => {
   try {
     const data = req.body;
-    const { variantImages } = splitFiles(req.files);
+    const { variantImages } = splitFiles(req.files); // đã có f.path là URL cloudinary
     const variants = JSON.parse(data.variants || "[]");
 
     if (!variants.length) {
       return res.status(400).json({ error: "Cần ít nhất 1 biến thể!" });
     }
 
-    // === Base folder Cloudinary (theo tên sản phẩm)
-    const safeName = data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const safeName = data.name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
     const baseFolder = `osso/products/${safeName}`;
 
-    // === Map lưu ảnh theo màu (upload 1 lần)
-    const colorImageMap = {}; // { colorId: [url1, url2...] }
+    const colorImageMap = {};
 
-    for (let i = 0; i < variants.length; i++) {
-      const v = variants[i];
+    for (const v of variants) {
       const files = variantImages[v.color] || [];
 
-      // Nếu màu này chưa upload -> upload lên Cloudinary
+      // Nếu có URL sẵn từ import hoặc upload
+      if (v.images?.length > 0 && !colorImageMap[v.color]) {
+        colorImageMap[v.color] = v.images;
+        continue;
+      }
+
+      // Dùng luôn ảnh do multer upload (đã có URL Cloudinary)
       if (!colorImageMap[v.color] && files.length) {
-        const uploadedUrls = [];
-
-        for (const f of files) {
-          // Nếu đã là URL Cloudinary (multer-storage-cloudinary) -> dùng luôn
-          if (f.path && f.path.startsWith("https://res.cloudinary.com")) {
-            uploadedUrls.push(f.path);
-            continue;
-          }
-
-          // Nếu là file local (chưa upload) -> upload thủ công
-          const uploadRes = await cloudinary.uploader.upload(f.path, {
-            folder: `${baseFolder}/${v.color}`,
-            unique_filename: true,
-            overwrite: false,
-          });
-          uploadedUrls.push(uploadRes.secure_url);
-        }
-
-        colorImageMap[v.color] = [...new Set(uploadedUrls)]; // loại trùng
-      } else if (!files.length && !colorImageMap[v.color]) {
-        return res.status(400).json({ error: `Biến thể ${i + 1} thiếu ảnh!` });
+        const urls = files.map((f) => f.path);
+        colorImageMap[v.color] = urls;
+      } else if (!files.length && !v.images?.length) {
+        console.warn(`⚠️ Biến thể màu ${v.color} chưa có ảnh upload hoặc ảnh URL.`);
       }
     }
 
-    // === Gán ảnh chung cho các variant cùng màu
+    // === Gán ảnh cho từng variant theo colorId
     const finalVariants = [];
     for (const v of variants) {
       const color = await Color.findById(v.color);
@@ -492,18 +340,17 @@ exports.createProduct = async (req, res) => {
       if (!sharedImages.length) continue;
 
       finalVariants.push({
-        sku: `${data.SKU}-${color.name}-${size.name}`.toUpperCase(),
+        sku: v.sku || `${data.SKU}-${color.name}-${size.name}`.toUpperCase(),
         color: v.color,
         size: v.size,
         price: Number(v.price),
         stockQuantity: Number(v.stock),
-        importPrice: Number(v.price) * 0.8,
+        importPrice: Number(v.importPrice || v.price * 0.8),
         images: sharedImages,
         coverImage: sharedImages[0],
       });
     }
 
-    // === Tạo sản phẩm
     const product = await Product.create({
       groupId: data.SKU,
       name: data.name,
@@ -525,6 +372,231 @@ exports.createProduct = async (req, res) => {
     res.status(500).json({ error: "Lỗi tạo sản phẩm", details: err.message });
   }
 };
+
+exports.importProducts = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "Vui lòng chọn file CSV hoặc XLSX!" });
+    }
+
+    const ext = path.extname(req.file.originalname).slice(1).toLowerCase();
+    let rows = [];
+
+    // --- Đọc file CSV hoặc XLSX ---
+    if (["xlsx", "xls"].includes(ext)) {
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+    } else if (ext === "csv") {
+      const text = req.file.buffer.toString("utf8");
+      rows = await new Promise((resolve, reject) => {
+        const data = [];
+        Readable.from(text)
+          .pipe(csv())
+          .on("data", (row) => data.push(row))
+          .on("end", () => resolve(data))
+          .on("error", reject);
+      });
+    } else {
+      return res.status(400).json({ error: "Chỉ hỗ trợ định dạng .csv hoặc .xlsx" });
+    }
+
+    if (!rows.length) {
+      return res.status(400).json({ error: "File rỗng hoặc không có dữ liệu!" });
+    }
+
+    // === Gom sản phẩm theo ID (mã chung) ===
+    const groups = {};
+    for (const r of rows) {
+      const id = (r.ID || "").trim();
+      if (!id) continue;
+
+      if (!groups[id]) {
+        groups[id] = {
+          id,
+          name: (r.Name || "").trim(),
+          brand: (r.Brand || "").trim() || "Khác",
+          description: (r.Description || "").trim(),
+          categoryName: (r.Category || "").trim(),
+          variants: [],
+        };
+      }
+
+      groups[id].variants.push({
+        sku: (r.SKU || "").trim(),
+        colorName: (r["Color name"] || "").trim(),
+        colorCode: (r["Color code"] || "").trim(),
+        sizeName: (r["Size name"] || "").trim(),
+        sizeCode: (r["Size code"] || "").trim(),
+        price: Number(r.Price || 0),
+        quantity: Number(r.Quantity || 0),
+        subImages: (r["Sub Images"] || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      });
+    }
+
+    const results = { success: [], failed: [] };
+
+    // === Xử lý từng nhóm sản phẩm (theo ID) ===
+    for (const id of Object.keys(groups)) {
+      const g = groups[id];
+
+      try {
+        // === Category
+        let category = null;
+        if (g.categoryName) {
+          category = await Category.findOne({
+            name: new RegExp(`^${g.categoryName}$`, "i"),
+          });
+          if (!category) {
+            category = await Category.create({ name: g.categoryName, isActive: true });
+          }
+        }
+
+        const safeName = g.name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+        const baseFolder = `osso/products/${safeName}`;
+
+        // === Map lưu ảnh theo màu (chung cho các size cùng màu)
+        const colorImageMap = {}; // { colorId: [urls] }
+        const finalVariants = [];
+
+        for (const v of g.variants) {
+          if (!v.colorName || !v.sizeName) continue;
+
+          // === Color
+          let color = await Color.findOne({
+            $or: [{ code: v.colorCode }, { name: new RegExp(`^${v.colorName}$`, "i") }],
+          });
+          if (!color) {
+            color = await Color.create({
+              name: v.colorName,
+              code: v.colorCode || "#000000",
+              isActive: true,
+            });
+          }
+
+          // === Size
+          let size = await Size.findOne({
+            $or: [{ code: v.sizeCode }, { name: new RegExp(`^${v.sizeName}$`, "i") }],
+          });
+          if (!size) {
+            size = await Size.create({
+              name: v.sizeName,
+              code: v.sizeCode || v.sizeName.toUpperCase(),
+              isActive: true,
+            });
+          }
+
+          // === Upload ảnh cho màu nếu chưa có
+          if (!colorImageMap[color._id]) {
+            const uploadedUrls = [];
+            for (const img of v.subImages) {
+              if (!img) continue;
+
+              if (img.startsWith("https://res.cloudinary.com")) {
+                uploadedUrls.push(img);
+              } else {
+                try {
+                  const uploadRes = await cloudinary.uploader.upload(img, {
+                    folder: baseFolder,
+                    use_filename: true,
+                    unique_filename: false,
+                    overwrite: false,
+                  });
+                  uploadedUrls.push(uploadRes.secure_url);
+                } catch (err) {
+                  console.warn(`⚠️ Upload lỗi ảnh ${img}:`, err.message);
+                }
+              }
+            }
+            colorImageMap[color._id] = uploadedUrls;
+          }
+
+          const sharedImages = colorImageMap[color._id] || [];
+
+          finalVariants.push({
+            sku: v.sku || `${id}-${v.colorName}-${v.sizeName}`.toUpperCase(),
+            color: color._id,
+            size: size._id,
+            price: v.price,
+            stockQuantity: v.quantity,
+            importPrice: Math.round(v.price * 0.8),
+            images: sharedImages,
+            coverImage: sharedImages[0] || null,
+          });
+        }
+
+        if (!finalVariants.length) {
+          results.failed.push({ id, error: "Không có biến thể hợp lệ" });
+          continue;
+        }
+
+        // === Kiểm tra nếu sản phẩm đã tồn tại ===
+        let product = await Product.findOne({ groupId: id });
+
+        if (product) {
+          // 🔹 Cập nhật thông tin chung, không upload lại ảnh
+          product.name = g.name || product.name;
+          product.brand = g.brand || product.brand;
+          product.description = g.description || product.description;
+          if (category?._id) product.category = category._id;
+
+          // 🔹 Cập nhật / thêm variant
+          for (const v of finalVariants) {
+            const exist = product.variants.find((ex) => ex.sku === v.sku);
+            if (exist) {
+              exist.price = v.price;
+              exist.stockQuantity = v.stockQuantity;
+              exist.importPrice = v.importPrice;
+              exist.color = v.color;
+              exist.size = v.size;
+            } else {
+              product.variants.push(v);
+            }
+          }
+
+          await product.save();
+
+          results.success.push({
+            message: `Đã cập nhật sản phẩm ${product.name}`,
+            productId: product._id,
+          });
+        } else {
+          // === Tạo mới
+          const newProduct = await Product.create({
+            groupId: id,
+            name: g.name,
+            SKU: g.variants[0]?.sku || id,
+            brand: g.brand,
+            description: g.description,
+            category: category?._id || null,
+            variants: finalVariants,
+          });
+
+          results.success.push({
+            message: `Tạo sản phẩm mới: ${newProduct.name}`,
+            productId: newProduct._id,
+          });
+        }
+      } catch (err) {
+        console.error(`❌ Lỗi xử lý ID ${id}:`, err.message);
+        results.failed.push({ id, error: err.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Import hoàn tất (${results.success.length} thành công, ${results.failed.length} lỗi)`,
+      results,
+    });
+  } catch (err) {
+    console.error("IMPORT ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 
 // === UPDATE PRODUCT ===
 exports.updateProduct = async (req, res) => {

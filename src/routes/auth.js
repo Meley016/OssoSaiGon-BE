@@ -8,8 +8,11 @@ const {
   logout,
   me
 } = require("../controllers/authController");
+const requireRole = require("../middlewares/requireRole");
+const { protect, apiProtect } = require("../middlewares/auth");
+const dashboardCtrl = require("../controllers/dashboardController");
 
-const { protect, adminAuth, apiProtect } = require("../middlewares/auth");
+
 // ✅ Page Login admin (render view)
 router.get("/login", (req, res) => {
   res.render("admin/login", { title: "Đăng nhập" });
@@ -29,8 +32,20 @@ router.post("/logout", logout);
 router.get("/me", apiProtect, me);
 
 // ✅ Admin Dashboard redirect
-router.get("/dashboard", protect, adminAuth, (req, res) => {
-  res.redirect("/admin/dashboard/product");
-});
+router.get("/dashboard",
+  protect,
+  requireRole("admin", "writer", "productAdder"),
+  (req, res) => {
+    const role = req.user.role;
+
+    if (role === "admin") return res.redirect("/admin/dashboard/product");
+    if (role === "writer") return res.redirect("/admin/dashboard/blog");
+    if (role === "productAdder") return res.redirect("/admin/dashboard/product");
+
+    // fallback nếu role lạ
+    res.redirect("/");
+  }
+);
+
 
 module.exports = router;

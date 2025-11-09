@@ -161,7 +161,7 @@
 let colorsRes = [], sizesRes = [], categoriesRes = [];
 let currentFilters = {};
 let currentPage = 1;
-const limit = 10;
+const limit = 12;
 
 // === THÊM BIẾN THỂ ===
 function addVariantRow(body, variant = {}, isEdit = false) {
@@ -360,7 +360,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("csv-import-form").onsubmit = async e => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    console.log("Import FormData:", Array.from(formData.entries()).map(([k, v]) => [k, v instanceof File ? v.name : v])); // Debug
+    const btn = e.target.querySelector("button[type='submit']");
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Đang nhập...";
+    console.log("Import FormData:", Array.from(formData.entries()).map(([k, v]) => [k, v instanceof File ? v.name : v]));
+
     try {
       const res = await fetch("/api/products/import", { method: "POST", body: formData });
       const data = await res.json();
@@ -371,7 +376,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (err) {
       showToast("Lỗi: " + err.message);
     }
+    finally {
+    // 🟢 Kết thúc loading
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
   };
+
 
   // === LỌC ===
   document.getElementById("btn-filter").onclick = () => {

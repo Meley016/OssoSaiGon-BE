@@ -39,7 +39,7 @@ exports.login = async (req, res) => {
       maxAge: 8 * 60 * 60 * 1000, // 8 tiếng
     });
 
-    if (user.role === "admin") {
+    if (["admin", "writer", "productAdder"].includes(user.role)) {
       req.session.admin = {
         id: user._id,
         email: user.email,
@@ -48,10 +48,15 @@ exports.login = async (req, res) => {
       };
     }
 
+    let redirectUrl = "/";
+    if (user.role === "admin") redirectUrl = "/admin/dashboard/product";
+    else if (user.role === "writer") redirectUrl = "/admin/dashboard/blog";
+    else if (user.role === "productAdder") redirectUrl = "/admin/dashboard/product";
+
     return res.json({
       success: true,
       message: "Đăng nhập thành công!",
-      redirect: user.role === "admin" ? "/admin/dashboard/product" : "/"
+      redirect: redirectUrl
     });
 
   } catch (err) {

@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Osso SaiGon</title>
+  <title>Osso SaiGon - Admin</title>
   <link rel="stylesheet" href="/css/dashboard.css" />
 </head>
 <body>
   <!-- Header -->
   <div class="header">
-        <div class="logo">
-          <img id="adminLogo" src="/images/default-logo.png" alt="Logo" />
-          <h1>Admin Dashboard</h1>
-        </div>
+    <div class="logo">
+      <img id="adminLogo" src="/images/default-logo.png" alt="Logo" />
+      <h1>Admin Dashboard</h1>
+    </div>
     <form action="/admin/logout" method="POST">
       <button type="submit" class="logout-btn">Đăng xuất</button>
     </form>
@@ -22,16 +22,54 @@
   <div class="content">
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
-      <a href="/admin/dashboard/product" class="<%= activeMenu === 'product' ? 'active' : '' %>">Sản phẩm</a>
-      <a href="/admin/dashboard/order" class="<%= activeMenu === 'order' ? 'active' : '' %>">Đơn hàng</a>
-      <a href="/admin/dashboard/user" class="<%= activeMenu === 'user' ? 'active' : '' %>">Người dùng</a>
-      <a href="/admin/dashboard/category" class="<%= activeMenu === 'category' ? 'active' : '' %>">Danh mục</a>
-      <a href="/admin/dashboard/promotion" class="<%= activeMenu === 'promotion' ? 'active' : '' %>">Khuyến mãi</a>
-      <a href="/admin/dashboard/shipping" class="<%= activeMenu === 'shipping' ? 'active' : '' %>">Vận chuyển</a>
-      <a href="/admin/dashboard/size" class="<%= activeMenu === 'size' ? 'active' : '' %>">Size</a>
-      <a href="/admin/dashboard/color" class="<%= activeMenu === 'color' ? 'active' : '' %>">Màu</a>
-      <a href="/admin/dashboard/blog" class="<%= activeMenu === 'blog' ? 'active' : '' %>">Bài viết</a>
-      <a href="/admin/dashboard/banner" class="<%= activeMenu === 'banner' ? 'active' : '' %>">Banner</a>
+      
+      <!-- Helper: Kiểm tra role được phép -->
+      <% 
+        const role = admin?.role || 'user';
+        const can = (roles) => roles.includes(role);
+      %>
+
+      <!-- MENU THEO QUYỀN -->
+      <% if (can(['admin', 'productAdder'])) { %>
+        <a href="/admin/dashboard/product" class="<%= activeMenu === 'product' ? 'active' : '' %>">Sản phẩm</a>
+      <% } %>
+
+      <% if (can(['admin'])) { %>
+        <a href="/admin/dashboard/order" class="<%= activeMenu === 'order' ? 'active' : '' %>">Đơn hàng</a>
+      <% } %>
+
+      <% if (can(['admin'])) { %>
+        <a href="/admin/dashboard/user" class="<%= activeMenu === 'user' ? 'active' : '' %>">Người dùng</a>
+      <% } %>
+
+      <% if (can(['admin', 'productAdder'])) { %>
+        <a href="/admin/dashboard/category" class="<%= activeMenu === 'category' ? 'active' : '' %>">Danh mục</a>
+      <% } %>
+
+      <% if (can(['admin', 'productAdder'])) { %>
+        <a href="/admin/dashboard/promotion" class="<%= activeMenu === 'promotion' ? 'active' : '' %>">Khuyến mãi</a>
+      <% } %>
+
+      <% if (can(['admin'])) { %>
+        <a href="/admin/dashboard/shipping" class="<%= activeMenu === 'shipping' ? 'active' : '' %>">Vận chuyển</a>
+      <% } %>
+
+      <% if (can(['admin', 'productAdder'])) { %>
+        <a href="/admin/dashboard/size" class="<%= activeMenu === 'size' ? 'active' : '' %>">Size</a>
+      <% } %>
+
+      <% if (can(['admin', 'productAdder'])) { %>
+        <a href="/admin/dashboard/color" class="<%= activeMenu === 'color' ? 'active' : '' %>">Màu</a>
+      <% } %>
+
+      <% if (can(['admin', 'writer'])) { %>
+        <a href="/admin/dashboard/blog" class="<%= activeMenu === 'blog' ? 'active' : '' %>">Bài viết</a>
+      <% } %>
+
+      <% if (can(['admin', 'writer'])) { %>
+        <a href="/admin/dashboard/banner" class="<%= activeMenu === 'banner' ? 'active' : '' %>">Banner</a>
+      <% } %>
+
       <button id="toggleSidebar" class="toggle-sidebar-btn">&lt;</button>
     </div>
 
@@ -40,21 +78,18 @@
       <%- include(`../partials/${activeMenu}`, { 
         activeMenu, 
         admin, 
-        orders,
-        categories, 
-        sizes, 
-        colors,
+        orders, categories, sizes, colors, products, users, promotions, shippings, blogs, banners 
       }) %>
     </div>
   </div>
 
+  <!-- Script: Toggle sidebar + Load logo -->
   <script>
-    // JavaScript để xử lý toggle sidebar
+    // Toggle Sidebar
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.getElementById('mainContent');
     const toggleBtn = document.getElementById('toggleSidebar');
 
-    // Kiểm tra trạng thái sidebar từ localStorage
     const isSidebarHidden = localStorage.getItem('sidebarHidden') === 'true';
     if (isSidebarHidden) {
       sidebar.classList.add('hidden');
@@ -67,28 +102,22 @@
       mainContent.classList.toggle('expanded');
       const isHidden = sidebar.classList.contains('hidden');
       toggleBtn.innerHTML = isHidden ? '&gt;' : '&lt;';
-      // Lưu trạng thái vào localStorage
       localStorage.setItem('sidebarHidden', isHidden);
     });
 
+    // Load Logo
     document.addEventListener("DOMContentLoaded", async () => {
-    try {
-      const res = await fetch("/api/banners/active?type=logo");
-      if (!res.ok) throw new Error("Không thể tải logo!");
-
-      const data = await res.json();
-      const logo = data[0]; // chỉ lấy cái đầu tiên (vì chỉ 1 logo active)
-      const imgEl = document.getElementById("adminLogo");
-
-      if (logo?.image) {
-        imgEl.src = logo.image;
-      } else {
-        imgEl.src = "/images/default-logo.png"; // fallback nếu không có
+      try {
+        const res = await fetch("/api/banners/active?type=logo");
+        if (!res.ok) throw new Error("Không tải được logo!");
+        const data = await res.json();
+        const logo = data[0];
+        const imgEl = document.getElementById("adminLogo");
+        imgEl.src = logo?.image || "/images/default-logo.png";
+      } catch (err) {
+        console.warn("Lỗi tải logo:", err.message);
       }
-    } catch (err) {
-      console.warn("⚠️ Lỗi tải logo:", err.message);
-    }
-  });
+    });
   </script>
 </body>
 </html>

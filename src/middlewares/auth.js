@@ -58,3 +58,13 @@ exports.requireRole = (...roles) => {
     next();
   };
 };
+
+exports.allowRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).render("admin/403", { title: "Không có quyền truy cập" });
+    }
+    next();
+  };
+};
+
