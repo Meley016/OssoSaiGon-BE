@@ -161,7 +161,7 @@
 let colorsRes = [], sizesRes = [], categoriesRes = [];
 let currentFilters = {};
 let currentPage = 1;
-const limit = 12;
+const limit = 21;
 
 // === THÊM BIẾN THỂ ===
 function addVariantRow(body, variant = {}, isEdit = false) {
@@ -283,7 +283,8 @@ function addVariantRow(body, variant = {}, isEdit = false) {
   row.querySelector(".btn-remove").onclick = () => row.remove();
 }
 
-function addVariantRowEdit(body, variant = {}, isExisting = false) {
+function addVariantRowEdit(body, variant = {}, isExisting = true) {
+
   const row = document.createElement("tr");
 
   const baseSKU = document.getElementById('edit-SKU').value || '';
@@ -291,7 +292,6 @@ function addVariantRowEdit(body, variant = {}, isExisting = false) {
   const sizeId = variant.size?._id || variant.size || '';
   const computedSKU = `${baseSKU}-${colorId}-${sizeId}`.toUpperCase();
 
-  // === ẢNH HIỆN TẠI (chỉ hiển thị, không cho sửa) ===
   const imagePreview = isExisting && variant.images?.length
     ? `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
          ${variant.images.map(img => `<img src="${img}" style="width:30px;height:30px;object-fit:cover;border-radius:3px;">`).join('')}
@@ -305,23 +305,11 @@ function addVariantRowEdit(body, variant = {}, isExisting = false) {
     ${isExisting ? `<input type="hidden" name="sizeId[]" value="${sizeId}">` : ''}
 
     <td data-label="Màu">
-      ${isExisting
-        ? `<span style="font-weight:500; color:#d4380d;">${variant.color?.name || 'N/A'}</span>`
-        : `<select name="variantColor[]" required class="ant-input" style="font-size:13px;" onchange="updateEditSKU(this)">
-             <option value="">--Chọn màu--</option>
-             ${colorsRes.map(c => `<option value="${c._id}" ${c._id === colorId ? 'selected' : ''}>${c.name}</option>`).join('')}
-           </select>`
-      }
+      <span style="font-weight:500; color:#d4380d;">${variant.color?.name || 'N/A'}</span>
     </td>
 
     <td data-label="Size">
-      ${isExisting
-        ? `<span style="font-weight:500; color:#d4380d;">${variant.size?.name || 'N/A'}</span>`
-        : `<select name="variantSize[]" required class="ant-input" style="font-size:13px;" onchange="updateEditSKU(this)">
-             <option value="">--Chọn size--</option>
-             ${sizesRes.map(s => `<option value="${s._id}" ${s._id === sizeId ? '' : ''}>${s.name}</option>`).join('')}
-           </select>`
-      }
+      <span style="font-weight:500; color:#d4380d;">${variant.size?.name || 'N/A'}</span>
     </td>
 
     <td data-label="SL">
@@ -329,7 +317,7 @@ function addVariantRowEdit(body, variant = {}, isExisting = false) {
     </td>
 
     <td data-label="Giá">
-      <input type="number" name="price[]" value="${variant.price || 0}" min="1" step="1" class="ant-input" required style="width:100px;">
+      <input type="number" name="price[]" value="${variant.price || 0}" min="1000" step="1000" class="ant-input" required style="width:100px;">
     </td>
 
     <td data-label="Ảnh">
@@ -342,17 +330,6 @@ function addVariantRowEdit(body, variant = {}, isExisting = false) {
   `;
 
   body.appendChild(row);
-
-  if (!isExisting) {
-    window.updateEditSKU = function(el) {
-      const row = el.closest("tr");
-      const color = row.querySelector("select[name='variantColor[]']").value;
-      const size = row.querySelector("select[name='variantSize[]']").value;
-      const base = document.getElementById('edit-SKU').value || '';
-      const newSKU = `${base}-${color}-${size}`.toUpperCase();
-      row.querySelector("input[name='variantSKU[]']").value = newSKU;
-    };
-  }
 
   row.querySelector(".btn-remove").onclick = () => {
     if (isExisting && !confirm("Xóa biến thể này? Dữ liệu sẽ mất vĩnh viễn!")) return;
@@ -518,9 +495,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const pagination = document.getElementById("pagination");
       const totalPages = data.pagination?.totalPages || 1;
-      pagination.innerHTML = totalPages ? Array.from({ length: totalPages }, (_, i) => `
-        <button class="${i + 1 === page ? 'active' : ''}" onclick="loadProducts(currentFilters, ${i + 1})">${i + 1}</button>
-      `).join("") : "";
+      renderPagination(page, totalPages);
     } catch (err) {
       document.getElementById("productGrid").innerHTML = '<p style="text-align:center;padding:20px;">Lỗi tải sản phẩm!</p>';
     }
@@ -586,7 +561,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Nút thêm biến thể mới
       const btnAdd = document.getElementById("edit-addVariant");
-      btnAdd.onclick = () => addVariantRowEdit(body, {}, false); // false = thêm mới
+      btnAdd.onclick = () => addNewVariantInEdit(body);
 
       document.getElementById('editModal').style.display = 'block';
     } catch (err) {
@@ -596,58 +571,81 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // === CẬP NHẬT ===
   document.getElementById("edit-form").onsubmit = async e => {
-  e.preventDefault();
-  const formData = new FormData();
-  const id = document.getElementById("edit-id").value;
+    e.preventDefault();
+    const formData = new FormData();
+    const id = document.getElementById("edit-id").value;
 
-  // Thông tin chung
-  ['SKU', 'name', 'brand', 'category', 'description'].forEach(f => {
-    const val = document.getElementById(`edit-${f}`).value.trim();
-    if (val) formData.append(f, val);
-  });
-
-  // Biến thể
-  const rows = document.querySelectorAll("#editVariantBody tr");
-  let hasValid = false;
-
-  for (const row of rows) {
-    const variantId = row.querySelector("input[name='variantId[]']")?.value || "";
-    const sku = row.querySelector("input[name='variantSKU[]']").value;
-    const colorId = row.querySelector("select[name='variantColor[]']")?.value ||
-                    row.querySelector("input[name='colorId[]']")?.value;
-    const sizeId = row.querySelector("select[name='variantSize[]']")?.value ||
-                   row.querySelector("input[name='sizeId[]']")?.value;
-    const stock = row.querySelector("input[name='stock[]']").value;
-    const price = row.querySelector("input[name='price[]']").value;
-
-    if (!sku || !colorId || !sizeId || !price || !stock) continue;
-
-    formData.append("variantId[]", variantId);
-    formData.append("sku[]", sku);
-    formData.append("colorId[]", colorId);
-    formData.append("sizeId[]", sizeId);
-    formData.append("price[]", price);
-    formData.append("stock[]", stock);
-    hasValid = true;
-  }
-
-  if (!hasValid) return showToast("Cần ít nhất 1 biến thể!", "error");
-
-  try {
-    const res = await fetch(`/api/products/${id}`, {
-      method: "PUT",
-      body: formData
+    // Thông tin chung
+    ['SKU', 'name', 'brand', 'category', 'description'].forEach(f => {
+      const val = document.getElementById(`edit-${f}`).value.trim();
+      if (val) formData.append(f, val);
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Lỗi cập nhật");
-    showToast("Cập nhật thành công!");
-    closeEditModal();
-    loadProducts();
-  } catch (err) {
-    showToast("Lỗi: " + err.message, "error");
-  }
-};
-  
+
+    // === XỬ LÝ BIẾN THỂ ===
+    const rows = document.querySelectorAll("#editVariantBody tr");
+    let hasValid = false;
+
+    const uploadedColors = new Set();
+
+    for (const row of rows) {
+      const variantId = row.querySelector("input[name='variantId[]']")?.value || "";
+      const sku = row.querySelector("input[name='variantSKU[]']")?.value || "";
+      const colorSelect = row.querySelector("select[name='variantColor[]']");
+      const sizeSelect = row.querySelector("select[name='variantSize[]']");
+      const isNew = colorSelect && sizeSelect; // mới = có select
+
+      let colorId, sizeId;
+
+      if (isNew) {
+        colorId = colorSelect.value;
+        sizeId = sizeSelect.value;
+      } else {
+        colorId = row.querySelector("input[name='colorId[]']")?.value;
+        sizeId = row.querySelector("input[name='sizeId[]']")?.value;
+      }
+
+      const stock = parseInt(row.querySelector("input[name='stock[]']")?.value || 0);
+      const price = parseInt(row.querySelector("input[name='price[]']")?.value || 0);
+
+      if (!sku || !colorId || !sizeId || price < 1000 || stock < 0) continue;
+
+      formData.append("variantId[]", variantId);
+      formData.append("sku[]", sku);
+      formData.append("colorId[]", colorId);
+      formData.append("sizeId[]", sizeId);
+      formData.append("price[]", price);
+      formData.append("stock[]", stock);
+      hasValid = true;
+
+      // === UPLOAD ẢNH MỚI (chỉ cho variant mới) ===
+      if (isNew && !uploadedColors.has(colorId)) {
+        const fileInput = row.querySelector("input[type='file']");
+        if (fileInput && fileInput.files.length > 0) {
+          Array.from(fileInput.files).forEach(f => {
+            formData.append(`variantImageFile[${colorId}]`, f);
+          });
+          uploadedColors.add(colorId);
+        }
+      }
+    }
+
+    if (!hasValid) return showToast("Cần ít nhất 1 biến thể!", "error");
+
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: "PUT",
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Lỗi cập nhật");
+      showToast("Cập nhật thành công!");
+      closeEditModal();
+      loadProducts();
+    } catch (err) {
+      showToast("Lỗi: " + err.message, "error");
+    }
+  };
+    
   window.closeEditModal = () => document.getElementById('editModal').style.display = 'none';
 
   window.deleteProduct = async id => {
@@ -664,7 +662,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   loadProducts();
 });
-function showToast(message, type = "success", duration = 5000) {
+  function showToast(message, type = "success", duration = 5000) {
   const container = document.getElementById("toastContainer");
   const toast = document.createElement("div");
   toast.className = `toast ${type}`;
@@ -684,5 +682,23 @@ function showToast(message, type = "success", duration = 5000) {
     setTimeout(() => toast.remove(), 300);
   }, duration);
 }
+  
+  function renderPagination(currentPage, totalPages) {
+    const pagination = document.getElementById("pagination");
+    let html = '';
+
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+
+    if (start > 1) html += `<button onclick="loadProducts(currentFilters,1)">1</button>${start > 2 ? '...' : ''}`;
+
+    for (let i = start; i <= end; i++) {
+      html += `<button class="${i === currentPage ? 'active' : ''}" onclick="loadProducts(currentFilters,${i})">${i}</button>`;
+    }
+
+    if (end < totalPages) html += `${end < totalPages - 1 ? '...' : ''}<button onclick="loadProducts(currentFilters,${totalPages})">${totalPages}</button>`;
+
+    pagination.innerHTML = html;
+  }
 
 </script>
