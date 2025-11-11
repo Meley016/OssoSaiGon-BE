@@ -216,7 +216,7 @@ exports.getProductById = async (req, res) => {
 
 //     // === Base folder Cloudinary (theo tên sản phẩm)
 //     const safeName = data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-//     const baseFolder = `osso/products/${safeName}`;
+//     const baseFolder = `oso/products/${safeName}`;
 
 //     // === Map lưu ảnh theo màu (upload 1 lần)
 //     const colorImageMap = {}; // { colorId: [url1, url2...] }
@@ -307,7 +307,7 @@ exports.createProduct = async (req, res) => {
     }
 
     const safeName = data.name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-    const baseFolder = `osso/products/${safeName}`;
+    const baseFolder = `oso/products/${safeName}`;
 
     const colorImageMap = {};
 
@@ -456,7 +456,7 @@ exports.importProducts = async (req, res) => {
         }
 
         const safeName = g.name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-        const baseFolder = `osso/products/${safeName}`;
+        const baseFolder = `oso/products/${safeName}`;
 
         // === Map lưu ảnh theo màu (chung cho các size cùng màu)
         const colorImageMap = {}; // { colorId: [urls] }
@@ -672,7 +672,7 @@ exports.deleteProduct = async (req, res) => {
     if (!product) return res.status(404).json({ error: "Không tìm thấy!" });
 
     const safeName = product.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const folder = `osso/products/${safeName}`;
+    const folder = `oso/products/${safeName}`;
 
     // XÓA TOÀN BỘ THƯ MỤC
     await cloudinary.api.delete_resources_by_prefix(folder);

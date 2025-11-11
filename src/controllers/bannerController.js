@@ -30,7 +30,7 @@ exports.create = async (req, res) => {
   try {
     const type = req.body.type || "banner";
     const fieldName = type === "logo" ? "logoImage" : "bannerImage";
-    const folder = type === "logo" ? "osso/logos" : "osso/banners";
+    const folder = type === "logo" ? "oso/logos" : "oso/banners";
     const file = req.files?.find(f => f.fieldname === fieldName);
     const imageUrl = file?.path || req.body.image;
 
@@ -134,7 +134,7 @@ exports.remove = async (req, res) => {
     const item = await Banner.findById(req.params.id);
     if (!item) return res.status(404).json({ error: "Không tìm thấy" });
 
-    const folder = item.type === "logo" ? "osso/logos" : "osso/banners";
+    const folder = item.type === "logo" ? "oso/logos" : "oso/banners";
     const publicId = item.image.split("/").slice(-1)[0].split(".")[0];
 
     try {

@@ -52,7 +52,7 @@ exports.updateBlog = async (req, res) => {
       if (blog.images && blog.images.length > 0) {
         for (const img of blog.images) {
           const publicId = img.split("/").pop().split(".")[0];
-          await cloudinary.uploader.destroy(`osso/blogs/${publicId}`).catch(() => {});
+          await cloudinary.uploader.destroy(`oso/blogs/${publicId}`).catch(() => {});
         }
       }
       const newImgs = req.files.filter(f => f.fieldname === "blogImages").map(f => f.path);
@@ -77,7 +77,7 @@ exports.deleteBlog = async (req, res) => {
     if (blog.images && blog.images.length > 0) {
       for (const img of blog.images) {
         const publicId = img.split("/").pop().split(".")[0];
-        await cloudinary.uploader.destroy(`osso/blogs/${publicId}`).catch(() => {});
+        await cloudinary.uploader.destroy(`oso/blogs/${publicId}`).catch(() => {});
       }
     }
 
