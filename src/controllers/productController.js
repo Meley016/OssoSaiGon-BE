@@ -665,7 +665,6 @@ exports.updateProduct = async (req, res) => {
     res.status(500).json({ error: "Lỗi cập nhật", details: err.message });
   }
 };
-
 // === DELETE PRODUCT ===
 exports.deleteProduct = async (req, res) => {
   try {
