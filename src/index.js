@@ -42,9 +42,9 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
   "https://ososaigon.com",
   "http://localhost:5173",
-  "https://ossosaigon-user.vercel.app",
+  "https://ososaigon-user.vercel.app",
   "http://localhost:3000",
-  "https://ossosaigon-admin.onrender.com", // THÊM URL RENDER (sẽ thay sau)
+  "https://ososaigon-admin.onrender.com", // THÊM URL RENDER (sẽ thay sau)
 ];
 
 
@@ -161,7 +161,7 @@ app.use((err, req, res, next) => {
 const server = app.listen(PORT, "0.0.0.0", () => {
   const port = server.address().port;
   console.log(`Server đang chạy tại: http://localhost:${port}`);
-  console.log(`Production URL: https://ossosaigon-admin.onrender.com`);
+  console.log(`Production URL: https://ososaigon-admin.onrender.com`);
 });
 
 module.exports = app;
