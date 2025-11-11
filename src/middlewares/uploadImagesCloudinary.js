@@ -5,39 +5,39 @@ const cloudinary = require("../config/cloudinary");
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
-    let folder = "osso/products";
+    let folder = "oso/products";
     let public_id = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // ✅ Avatar người dùng
     if (file.fieldname === "avatar") {
-      folder = "osso/users/avatars";
+      folder = "oso/users/avatars";
     }
 
     // ✅ Ảnh variant của sản phẩm
     else if (file.fieldname.includes("variantImageFile")) {
       const productName = req.body.name || req.body.SKU || "unknown";
       const safeName = productName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-      folder = `osso/products/${safeName}`;
+      folder = `oso/products/${safeName}`;
     }
 
     // ✅ Ảnh danh mục
     else if (file.fieldname === "categoryImage") {
-      folder = "osso/categories";
+      folder = "oso/categories";
     }
 
     // ✅ Ảnh blog
     else if (file.fieldname === "blogImages") {
-      folder = "osso/blogs";
+      folder = "oso/blogs";
     }
 
     // ✅ Ảnh banner
     else if (file.fieldname === "bannerImage") {
-      folder = "osso/banners";
+      folder = "oso/banners";
     }
 
     // ✅ Ảnh logo
     else if (file.fieldname === "logoImage") {
-      folder = "osso/logos";
+      folder = "oso/logos";
     }
 
     return {
