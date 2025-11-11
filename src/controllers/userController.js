@@ -183,7 +183,7 @@ exports.updateMe = async (req, res) => {
       const confirmUrl = `${process.env.CLIENT_URL}/confirm-email/${emailToken}`;
       await sendEmail({
         to: req.body.email,
-        subject: "Xác nhận thay đổi email - Osso Saigon",
+        subject: "Xác nhận thay đổi email - Oso Saigon",
         templateName: "verifyEmail",
         variables: {
           name: user.name,
@@ -205,7 +205,7 @@ exports.updateMe = async (req, res) => {
       const confirmUrl = `${process.env.CLIENT_URL}/confirm-password/${passwordToken}`;
       await sendEmail({
         to: user.email,
-        subject: "Xác nhận đổi mật khẩu - Osso Saigon",
+        subject: "Xác nhận đổi mật khẩu - Oso Saigon",
         templateName: "resetPassword",
         variables: {
           name: user.name,
