@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Osso SaiGon - Admin</title>
+  <title>ososaigon - Admin</title>
+  <link id="favicon" rel="icon" type="image/png" href="/images/default-logo.png" />
   <link rel="stylesheet" href="/css/dashboard.css" />
 </head>
 <body>
@@ -113,7 +114,10 @@
         const data = await res.json();
         const logo = data[0];
         const imgEl = document.getElementById("adminLogo");
-        imgEl.src = logo?.image || "/images/default-logo.png";
+        const favicon = document.getElementById("favicon"); 
+        const logoUrl = logo?.image || "/images/default-logo.png";
+        imgEl.src = logoUrl;
+        favicon.href = logoUrl;
       } catch (err) {
         console.warn("Lỗi tải logo:", err.message);
       }
