@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ososaigon - Admin</title>
+  <title>Admin</title>
   <link id="favicon" rel="icon" type="image/png" href="/images/default-logo.png" />
   <link rel="stylesheet" href="/css/dashboard.css" />
 </head>
@@ -71,6 +71,9 @@
         <a href="/admin/dashboard/banner" class="<%= activeMenu === 'banner' ? 'active' : '' %>">Banner</a>
       <% } %>
 
+      <% if (can(['admin'])) { %>
+        <a href="/admin/dashboard/footer" class="<%= activeMenu === 'footer' ? 'active' : '' %>">Footer</a>
+      <% } %>
       <button id="toggleSidebar" class="toggle-sidebar-btn">&lt;</button>
     </div>
 
@@ -79,7 +82,7 @@
       <%- include(`../partials/${activeMenu}`, { 
         activeMenu, 
         admin, 
-        orders, categories, sizes, colors, products, users, promotions, shippings, blogs, banners 
+        orders, categories, sizes, colors, products, users, promotions, shippings, blogs, banners, footer
       }) %>
     </div>
   </div>
