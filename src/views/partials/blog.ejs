@@ -127,35 +127,45 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      grid.innerHTML = blogs.map((b, i) => {
-        // 🔒 Escape dữ liệu để không bị vỡ HTML
-        const safeTitle = b.title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-        const safeContent = encodeURIComponent(b.content);
+grid.innerHTML = blogs.map((b, i) => {
+  const safeTitle = b.title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+  const safeContent = encodeURIComponent(b.content);
 
-        return `
-          <tr>
-            <td>${i + 1}</td>
-            <td>
-              ${
-                b.images?.[0]
-                  ? `<img src="${b.images[0]}" alt="${b.title}" style="width:70px;height:70px;object-fit:cover;border-radius:4px;">`
-                  : `<div class="no-img">Không có</div>`
-              }
-            </td>
-            <td>${b.title}</td>
-            <td>${b.content.length > 60 ? b.content.slice(0, 60) + "..." : b.content}</td>
-            <td>${new Date(b.createdAt).toLocaleDateString()}</td>
-            <td>
-              <button 
-                class="btn-edit" 
-                onclick="editBlog('${b._id}', '${safeTitle}', decodeURIComponent('${safeContent}'))">
-                Sửa
-              </button>
-              <button class="btn-delete" onclick="deleteBlog('${b._id}')">Xóa</button>
-            </td>
-          </tr>
-        `;
-      }).join("");
+  // ✂️ Tạo bản rút gọn HTML mà vẫn giữ định dạng
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = b.content;
+  let shortContent = tempDiv.innerText; // lấy text thuần để tính độ dài
+  if (shortContent.length > 120) {
+    shortContent = shortContent.slice(0, 120) + "...";
+  }
+
+  return `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${
+        b.images?.[0]
+          ? `<img src="${b.images[0]}" alt="${b.title}" style="width:70px;height:70px;object-fit:cover;border-radius:4px;">`
+          : `<div class="no-img">Không có</div>`
+      }</td>
+      <td>${b.title}</td>
+      <td class="blog-preview">${shortContent}</td>
+      <td>${new Date(b.createdAt).toLocaleDateString()}</td>
+      <td>
+        <button class="btn-edit" onclick="event.stopPropagation(); editBlog('${b._id}', '${safeTitle}', decodeURIComponent('${safeContent}'))">Sửa</button>
+        <button class="btn-delete" onclick="event.stopPropagation(); deleteBlog('${b._id}')">Xóa</button>
+      </td>
+    </tr>
+  `;
+}).join("");
+
+// 🚫 Ngăn tất cả link trong nội dung hoạt động
+grid.querySelectorAll("a").forEach(a => {
+  a.addEventListener("click", e => e.preventDefault());
+  a.style.pointerEvents = "none";
+  a.style.textDecoration = "none";
+  a.style.color = "inherit";
+});
+
     } catch (err) {
       console.error(err);
       grid.innerHTML = `<tr><td colspan="6" style="text-align:center;color:red;">Lỗi tải bài viết.</td></tr>`;

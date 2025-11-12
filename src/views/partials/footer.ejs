@@ -1,0 +1,215 @@
+<!-- Footer Management Section -->
+<link rel="stylesheet" href="/css/globe.css" />
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
+<script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+<style>
+/* Giới hạn chiều cao editor */
+.editor,
+#editor,
+#editEditor {
+  max-height: 200px;       /* chiều cao tối đa */
+  overflow-y: auto;        /* tạo scroll khi quá cao */
+  word-break: break-word;  /* xuống dòng khi text dài */
+}
+
+/* Bảng responsive: tự xuống dòng khi màn hình nhỏ */
+@media (max-width: 768px) {
+  .ant-table thead {
+    display: none;
+  }
+  .ant-table tr {
+    display: block;
+    margin-bottom: 16px;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 8px;
+  }
+  .ant-table td {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    word-break: break-word;
+  }
+  .ant-table td::before {
+    content: attr(data-label);
+    font-weight: bold;
+  }
+}
+</style>
+
+<div class="container">
+  <div class="form-section">        
+    <h2 class="section-title">Quản lý Footer Info</h2>
+    <% 
+    const footerTypes = ["shipping", "returns", "terms", "privacy"];
+    const footerMap = {};
+    footer.forEach(f => footerMap[f.type] = f);
+    %>
+    <div class="promotion-table">
+        <table class="ant-table">
+            <thead>
+            <tr>
+                <th style="width: 50px;">STT</th>
+                <th>Loại</th>
+                <th>Tiêu đề</th>
+                <th>Cập nhật</th>
+                <th style="width: 120px;">Hành động</th>
+            </tr>
+            </thead>
+            <tbody>
+            <% footerTypes.forEach((type, i) => { 
+                const f = footerMap[type] || {};
+            %>
+                <tr>
+                    <td data-label="STT"><%= i + 1 %></td>
+                    <td data-label="Loại"><%= type %></td>
+                    <td data-label="Tiêu đề"><%= f.title || "(Chưa có)" %></td>
+                    <td data-label="Cập nhật"><%= f.updatedAt ? new Date(f.updatedAt).toLocaleDateString('vi-VN') : "" %></td>
+                    <td data-label="Hành động">
+                        <button class="btn-edit" data-id="<%= f._id || '' %>" data-type="<%= type %>">Sửa</button>
+                    </td>
+                </tr>
+
+                <!-- Form ẩn bên dưới từng row -->
+                <tr class="edit-row" style="display:none;">
+                    <td colspan="5">
+                        <form class="footerFormRow">
+                            <input type="hidden" class="footerId" value="<%= f._id || '' %>">
+                            <input type="hidden" class="footerType" value="<%= type %>">
+                            <div class="ant-form-item">
+                                <label>Tiêu đề</label>
+                                <input type="text" class="footerTitle ant-input" value="<%= f.title || '' %>" required>
+                            </div>
+                            <div class="ant-form-item">
+                                <label>Nội dung</label>
+                                <div class="editor" style="height:200px; background:white; border:1px solid #ccc; border-radius:6px;"></div>
+                            </div>
+                            <div class="button-row" style="justify-content:flex-end;">
+                                <button type="button" class="btn-cancel btn-reset">Hủy</button>
+                                <button type="submit" class="btn-save btn-custom">Lưu</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+            <% }) %>
+            </tbody>
+        </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Thông báo -->
+<div id="modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
+     background:white; padding:20px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.3); z-index:9999;">
+  <p id="modalMessage" style="align-items: center; margin:0 0 12px;"></p>
+  <button class="btn-custom" id="modalClose">Đóng</button>
+</div>
+<div id="modalOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
+     background:rgba(0,0,0,0.3); z-index:9998;"></div>
+
+<script>
+  const quillMap = new Map();
+
+  function showModal(message) {
+    document.getElementById("modalMessage").innerText = message;
+    document.getElementById("modal").style.display = "block";
+    document.getElementById("modalOverlay").style.display = "block";
+  }
+
+  document.getElementById("modalClose").addEventListener("click", () => {
+    document.getElementById("modal").style.display = "none";
+    document.getElementById("modalOverlay").style.display = "none";
+  });
+
+  // Bật editor khi click Sửa
+  document.querySelectorAll(".btn-edit").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const tr = btn.closest("tr");
+      const editRow = tr.nextElementSibling;
+      const type = btn.dataset.type;
+      const id = btn.dataset.id;
+
+      // Ẩn tất cả row khác
+      document.querySelectorAll(".edit-row").forEach(r => {
+        if(r !== editRow) r.style.display = "none";
+      });
+
+      // Toggle row hiện tại
+      editRow.style.display = editRow.style.display === "table-row" ? "none" : "table-row";
+
+      const editorDiv = editRow.querySelector(".editor");
+
+      // Khởi tạo Quill nếu chưa có
+      if (!quillMap.has(editorDiv)) {
+        const quill = new Quill(editorDiv, {
+          theme: "snow",
+          placeholder: "Nhập nội dung Footer...",
+          modules: {
+            toolbar: [
+              [{ header: [1, 2, 3, false] }],
+              ["bold", "italic", "underline", "strike"],
+              [{ color: [] }, { background: [] }],
+              [{ align: [] }],
+              ["link"],
+              ["clean"]
+            ]
+          }
+        });
+        quillMap.set(editorDiv, quill);
+      }
+
+      const quill = quillMap.get(editorDiv);
+
+      // Nếu chưa có ID, reset
+      if (!id) {
+        quill.root.innerHTML = "";
+        return;
+      }
+ 
+      // Lấy dữ liệu từ server
+      try {
+        const res = await fetch(`/api/footer/${type}`);
+        if (!res.ok) throw new Error("Không tải được dữ liệu Footer!");
+        const data = await res.json();
+
+        quill.root.innerHTML = data.content || "";
+        editRow.querySelector(".footerTitle").value = data.title || "";
+        editRow.querySelector(".footerId").value = data._id;
+      } catch (err) {
+        showModal("❌ " + err.message);
+      }
+    });
+  });
+
+  // Submit form row
+  document.querySelectorAll(".footerFormRow").forEach(form => {
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+
+      const id = form.querySelector(".footerId").value;
+      const type = form.querySelector(".footerType").value;
+      const title = form.querySelector(".footerTitle").value.trim();
+      const editorDiv = form.querySelector(".editor");
+      const quill = quillMap.get(editorDiv);
+      const content = quill ? quill.root.innerHTML : "";
+
+      try {
+        const res = await fetch(`/api/footer/${type}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, content })
+        });
+        if (!res.ok) throw new Error("Lưu thất bại!");
+        showModal("Đã lưu Footer!");
+        setTimeout(() => location.reload(), 1000);
+      } catch (err) {
+        showModal("❌ " + err.message);
+      }
+    });
+
+    // Nút Hủy
+    form.querySelector(".btn-cancel").addEventListener("click", () => {
+      form.closest(".edit-row").style.display = "none";
+    });
+  });
+</script>

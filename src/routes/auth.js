@@ -11,6 +11,7 @@ const {
 const requireRole = require("../middlewares/requireRole");
 const { protect, apiProtect } = require("../middlewares/auth");
 const dashboardCtrl = require("../controllers/dashboardController");
+const authController = require("../controllers/authController");
 
 
 // ✅ Page Login admin (render view)
@@ -46,6 +47,9 @@ router.get("/dashboard",
     res.redirect("/");
   }
 );
+
+router.post("/forgot-password/send-otp", authController.sendForgotOtp);
+router.post("/forgot-password/verify", authController.verifyForgotOtp);
 
 
 module.exports = router;

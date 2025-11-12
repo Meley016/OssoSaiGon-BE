@@ -10,10 +10,10 @@ const Promotion = require("../models/Promotion");
 const Shipping = require("../models/Shipping");
 const Blog = require("../models/Blog");
 const Banner = require("../models/Banner");
-
+const Footer = require("../models/FooterInfo")
 // CẤU HÌNH QUYỀN TRUY CẬP THEO ROLE
 const PERMISSIONS = {
-  admin: ["product", "category", "size", "color", "order", "user", "promotion", "shipping", "blog", "banner"],
+  admin: ["product", "category", "size", "color", "order", "user", "promotion", "shipping", "blog", "banner","footer"],
   writer: ["blog", "banner"],
   productAdder: ["product", "category", "size", "color", "promotion"]
 };
@@ -51,7 +51,8 @@ exports.renderSection = async (req, res) => {
       promotions: [],
       shippings: [],
       blogs: [],
-      banners: []
+      banners: [],
+      footer: [],
     };
 
     // LOAD DỮ LIỆU THEO SECTION
@@ -103,6 +104,9 @@ exports.renderSection = async (req, res) => {
 
       case "banner":
         data.banners = await Banner.find().sort({ order: 1 });
+        break;
+      case "footer":
+        data.footer = await Footer.find().sort({ createdAt: -1});
         break;
     }
 

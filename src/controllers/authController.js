@@ -1,6 +1,59 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { User } = require("../models/User");
+const { sendEmail } = require("../utils/email");
+
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+exports.sendForgotOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ error: "Email không tồn tại trong hệ thống" });
+
+    const otp = generateOtp();
+    user.passwordToken = otp; // dùng lại field sẵn có
+    user.passwordTokenExpire = Date.now() + 15 * 60 * 1000; // hết hạn 15 phút
+    await user.save();
+
+    await sendEmail({
+      to: email,
+      subject: "Mã xác nhận quên mật khẩu - Oso Saigon",
+      templateName: "otpVerify",
+      variables: { name: user.name || "bạn", code: otp },
+    });
+
+    res.json({ success: true, message: "Đã gửi mã xác nhận đến email của bạn" });
+  } catch (err) {
+    console.error("sendForgotOtp error:", err);
+    res.status(500).json({ error: "Không thể gửi mã xác nhận" });
+  }
+};
+
+exports.verifyForgotOtp = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ error: "Không tìm thấy user" });
+
+    if (!user.passwordToken || user.passwordTokenExpire < Date.now())
+      return res.status(400).json({ error: "Mã OTP đã hết hạn" });
+    if (user.passwordToken !== otp)
+      return res.status(400).json({ error: "Mã OTP không đúng" });
+
+    user.password = newPassword;
+    user.passwordToken = undefined;
+    user.passwordTokenExpire = undefined;
+    await user.save();
+
+    res.json({ success: true, message: "Đổi mật khẩu thành công!" });
+  } catch (err) {
+    console.error("verifyForgotOtp error:", err);
+    res.status(500).json({ error: "Lỗi xác nhận mã OTP" });
+  }
+};
 
 // ---------------- LOGIN ----------------
 exports.login = async (req, res) => {
