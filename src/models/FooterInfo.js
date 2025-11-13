@@ -1,3 +1,4 @@
+// models/FooterInfo.js
 const mongoose = require("mongoose");
 
 const footerInfoSchema = new mongoose.Schema(
@@ -8,8 +9,14 @@ const footerInfoSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    title: { type: String, required: true },
-    content: { type: String, required: true },
+    title: {
+      vi: { type: String, default: "" },
+      en: { type: String, default: "" },
+    },
+    content: {
+      vi: { type: String, default: "" },
+      en: { type: String, default: "" },
+    },
   },
   { timestamps: true }
 );
