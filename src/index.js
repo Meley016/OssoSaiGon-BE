@@ -4,7 +4,10 @@ const session = require("express-session");
 const path = require("path");
 const fs = require("fs");
 const cookieParser = require("cookie-parser");
+const helmet = require("helmet");
 require("dotenv").config();
+const cron = require("node-cron");
+const cancelExpiredOrders = require("./utils/cancelExpired");
 
 const connectDB = require("./config/database");
 const MongoStore = require("connect-mongo");
@@ -35,11 +38,23 @@ connectDB();
 
 const app = express();
 
-// === SỬA 1: LẤY PORT TỪ ENV HOẶC DÙNG 3000 (Render yêu cầu) ===
+// === CSP FOR VNPAY ===
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://sandbox.vnpayment.vn", "https://pay.vnpayment.vn"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://sandbox.vnpayment.vn", "https://pay.vnpayment.vn"],
+      imgSrc: ["'self'", "data:", "https://sandbox.vnpayment.vn", "https://pay.vnpayment.vn"],
+      frameSrc: ["https://sandbox.vnpayment.vn", "https://pay.vnpayment.vn"],
+      connectSrc: ["'self'", "https://sandbox.vnpayment.vn", "https://pay.vnpayment.vn"]
+    }
+  })
+);
+
 const PORT = process.env.PORT || 3000;
 
 
-// === SỬA 2: THÊM URL RENDER VÀO ALLOWED ORIGINS (ĐỂ EJS GỌI API) ===
 const allowedOrigins = [
   "https://ososaigon.com",
   "http://localhost:5173",
@@ -48,6 +63,7 @@ const allowedOrigins = [
   "https://ososaigon-admin.onrender.com", // THÊM URL RENDER (sẽ thay sau)
 ];
 
+cron.schedule("*/5 * * * *", cancelExpiredOrders); // mỗi 5 phút tự động hủy đơn tạm hết hạn
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -158,7 +174,6 @@ app.use((err, req, res, next) => {
   .json({ error: err.message || "Server Error!" });
 });
 
-// === SỬA 4: ĐÚNG CÚ PHÁP app.listen() + BIND 0.0.0.0 ===
 const server = app.listen(PORT, "0.0.0.0", () => {
   const port = server.address().port;
   console.log(`Server đang chạy tại: http://localhost:${port}`);

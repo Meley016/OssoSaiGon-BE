@@ -1,7 +1,7 @@
 const Banner = require("../models/Banner");
 const cloudinary = require("../config/cloudinary");
 
-// 🟢 Lấy danh sách (admin)
+//  Lấy danh sách (admin)
 exports.getAll = async (req, res) => {
   try {
     const type = req.query.type || "banner";
@@ -13,7 +13,7 @@ exports.getAll = async (req, res) => {
   }
 };
 
-// 🟢 Lấy danh sách active (client)
+//  Lấy danh sách active (client)
 exports.getActive = async (req, res) => {
   try {
     const type = req.query.type || "banner";
@@ -25,7 +25,7 @@ exports.getActive = async (req, res) => {
   }
 };
 
-// 🟡 Tạo mới (banner hoặc logo)
+//  Tạo mới (banner hoặc logo)
 exports.create = async (req, res) => {
   try {
     const type = req.body.type || "banner";
@@ -74,8 +74,7 @@ exports.create = async (req, res) => {
   }
 };
 
-// 🔵 Cập nhật
-// 🔵 Cập nhật trạng thái hiển thị
+//  Cập nhật trạng thái hiển thị
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
@@ -128,7 +127,7 @@ exports.update = async (req, res) => {
 };
 
 
-// 🔴 Xóa banner hoặc logo
+//  Xóa banner hoặc logo
 exports.remove = async (req, res) => {
   try {
     const item = await Banner.findById(req.params.id);

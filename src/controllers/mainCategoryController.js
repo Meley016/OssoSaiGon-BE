@@ -1,7 +1,7 @@
 const MainCategory = require("../models/MainCategory");
 const Category = require("../models/Category");
 
-// 🟢 Lấy tất cả danh mục lớn
+//  Lấy tất cả danh mục lớn
 exports.getAllMainCategories = async (req, res) => {
   try {
     const mains = await MainCategory.find().sort({ createdAt: -1 });
@@ -11,7 +11,7 @@ exports.getAllMainCategories = async (req, res) => {
   }
 };
 
-// 🟢 Lấy 1 danh mục lớn theo ID
+// Lấy 1 danh mục lớn theo ID
 exports.getMainCategoryById = async (req, res) => {
   try {
     const main = await MainCategory.findById(req.params.id);
@@ -22,7 +22,7 @@ exports.getMainCategoryById = async (req, res) => {
   }
 };
 
-// 🟢 Tạo danh mục lớn
+// Tạo danh mục lớn
 exports.createMainCategory = async (req, res) => {
   try {
     const { name, description } = req.body;
@@ -41,7 +41,7 @@ exports.createMainCategory = async (req, res) => {
   }
 };
 
-// 🟠 Cập nhật danh mục lớn
+// Cập nhật danh mục lớn
 exports.updateMainCategory = async (req, res) => {
   try {
     const { id } = req.params;
@@ -61,7 +61,7 @@ exports.updateMainCategory = async (req, res) => {
   }
 };
 
-// 🔴 Xóa danh mục lớn
+// Xóa danh mục lớn
 exports.deleteMainCategory = async (req, res) => {
   try {
     const { id } = req.params;
@@ -79,7 +79,7 @@ exports.deleteMainCategory = async (req, res) => {
   }
 };
 
-// 🧭 Gắn Category con vào Main Category
+// Gắn Category con vào Main Category
 exports.assignCategoryToMain = async (req, res) => {
   try {
     const { mainCategoryId, categoryId } = req.body;

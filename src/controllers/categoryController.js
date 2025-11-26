@@ -13,7 +13,7 @@ exports.getAllCategories = async (req, res) => {
 
 exports.getAllCategories = async (req, res) => {
   try {
-    // ✅ populate mainCategory để FE hiển thị tên
+    // populate mainCategory để FE hiển thị tên
     const categories = await Category.find({})
       .populate("mainCategory", "name _id")
       .sort({ name: 1 });
@@ -117,7 +117,6 @@ exports.updateCategory = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
-
 
 exports.deleteCategory = async (req, res) => {
   try {
