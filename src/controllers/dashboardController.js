@@ -22,15 +22,15 @@ exports.renderSection = async (req, res) => {
   const section = req.params.section;
   const validSections = Object.values(PERMISSIONS).flat();
 
-  // 1. Kiểm tra section hợp lệ
+  //  Kiểm tra section hợp lệ
   if (!validSections.includes(section)) {
     return res.status(404).render("admin/404", { title: "404 - Không tìm thấy" });
   }
 
-  // 2. LẤY ROLE TỪ req.user HOẶC req.session.admin
+  //  LẤY ROLE TỪ req.user HOẶC req.session.admin
   const role = req.user?.role || req.session?.admin?.role;
 
-  // 3. KIỂM TRA QUYỀN
+  //  KIỂM TRA QUYỀN
   if (!role || !PERMISSIONS[role]?.includes(section)) {
     return res.status(403).render("admin/403", {
       title: "403 - Không có quyền",

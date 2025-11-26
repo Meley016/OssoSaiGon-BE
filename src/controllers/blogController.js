@@ -1,7 +1,7 @@
 const Blog = require("../models/Blog");
 const cloudinary = require("../config/cloudinary");
 
-// 📜 Lấy tất cả bài viết
+//  Lấy tất cả bài viết
 exports.getBlogs = async (req, res) => {
   try {
     const blogs = await Blog.find().sort({ createdAt: -1 });
@@ -12,7 +12,7 @@ exports.getBlogs = async (req, res) => {
   }
 };
 
-// ➕ Tạo bài viết mới
+//  Tạo bài viết mới
 exports.createBlog = async (req, res) => {
   try {
     const { title, content } = req.body;
@@ -35,7 +35,7 @@ exports.createBlog = async (req, res) => {
   }
 };
 
-// ✏️ Cập nhật bài viết
+// Cập nhật bài viết
 exports.updateBlog = async (req, res) => {
   try {
     const { id } = req.params;
@@ -67,7 +67,7 @@ exports.updateBlog = async (req, res) => {
   }
 };
 
-// 🗑️ Xóa bài viết
+// Xóa bài viết
 exports.deleteBlog = async (req, res) => {
   try {
     const { id } = req.params;

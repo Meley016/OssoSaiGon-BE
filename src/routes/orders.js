@@ -5,6 +5,7 @@ const { protect, apiProtect, requireRole } = require("../middlewares/auth");
 
 // 🧾 Client CRUD
 router.post("/", apiProtect, orderController.createOrder);
+router.post("/pre-create", apiProtect, orderController.preCreateOrder);
 
 // 🛠️ Admin quản lý toàn bộ
 router.get("/", protect, requireRole("admin"), orderController.getOrders);

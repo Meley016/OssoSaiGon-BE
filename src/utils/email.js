@@ -3,22 +3,25 @@ const fs = require("fs");
 const path = require("path");
 
 // === [MỚI] Import hàm lấy logo ===
-const { getActiveLogo } = require("./logo"); // <-- THÊM DÒNG NÀY
+const { getActiveLogo } = require("./logo");  
 
 // === Hàm render HTML template ===
 function renderTemplate(templateName, variables) {
   const filePath = path.join(__dirname, "../templates", `${templateName}.html`);
   let html = fs.readFileSync(filePath, "utf8");
+
+  // Replace an toàn bằng split + join
   for (const [key, value] of Object.entries(variables)) {
-    html = html.replace(new RegExp(`{{${key}}}`, "g"), value);
+    html = html.split(`{{${key}}}`).join(value);
   }
+
   return html;
 }
 
 // === Gửi email qua Brevo API ===
 async function sendEmail({ to, subject, templateName, variables }) {
   // === [MỚI] Lấy logo từ DB (internal) ===
-  const logoUrl = await getActiveLogo(); // <-- THÊM 2 DÒNG NÀY
+  const logoUrl = await getActiveLogo();  
   const fullVariables = { ...variables, logo: logoUrl }; // <-- Gộp vào variables
 
   const html = renderTemplate(templateName, fullVariables); // <-- Dùng fullVariables
