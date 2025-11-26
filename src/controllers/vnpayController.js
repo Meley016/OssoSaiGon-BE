@@ -15,19 +15,26 @@ const vnpayConfig = {
   ipnUrl: process.env.VNP_IPN_URL,
 };
 
+function generateTxnRef(order) {
+  const random = crypto.randomBytes(4).toString('hex'); // 8 hex chars
+  return `${order.orderCode}_${random}`; // e.g. ORD000123_ab12cd34
+}
 // Validate config
 if (!vnpayConfig.tmnCode || !vnpayConfig.hashSecret || !vnpayConfig.returnUrl) {
   console.error("⚠️ VNPay config missing in .env");
 }
-
 // ======================= HELPERS =======================
-function formatDate(date) {
-  const yyyy = date.getFullYear().toString();
-  const MM = (date.getMonth() + 1).toString().padStart(2, "0");
-  const dd = date.getDate().toString().padStart(2, "0");
-  const hh = date.getHours().toString().padStart(2, "0");
-  const mm = date.getMinutes().toString().padStart(2, "0");
-  const ss = date.getSeconds().toString().padStart(2, "0");
+function formatDateVN(date) {
+  // Chuyển về UTC+7
+  const vnDate = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+
+  const yyyy = vnDate.getUTCFullYear().toString();
+  const MM = (vnDate.getUTCMonth() + 1).toString().padStart(2, "0");
+  const dd = vnDate.getUTCDate().toString().padStart(2, "0");
+  const hh = vnDate.getUTCHours().toString().padStart(2, "0");
+  const mm = vnDate.getUTCMinutes().toString().padStart(2, "0");
+  const ss = vnDate.getUTCSeconds().toString().padStart(2, "0");
+
   return `${yyyy}${MM}${dd}${hh}${mm}${ss}`;
 }
 
@@ -87,10 +94,11 @@ async function createVNPayUrl(order, req) {
   if (!vnpayConfig.tmnCode || !vnpayConfig.hashSecret || !vnpayConfig.returnUrl) {
     throw new Error("VNPay not configured properly");
   }
+  const txnRef = generateTxnRef(order);
 
   const date = new Date();
-  const createDate = formatDate(date);
-  const expireDate = formatDate(new Date(date.getTime() + 15 * 60 * 1000));
+  const createDate = formatDateVN(date);
+  const expireDate = formatDateVN(new Date(date.getTime() + 15 * 60 * 1000));
 
   const vnpParams = {
     vnp_Version: "2.1.0",
@@ -98,7 +106,7 @@ async function createVNPayUrl(order, req) {
     vnp_TmnCode: vnpayConfig.tmnCode,
     vnp_Locale: "vn",
     vnp_CurrCode: "VND",
-    vnp_TxnRef: order._id.toString(),
+    vnp_TxnRef: txnRef,
     vnp_OrderInfo: `Thanh toan don hang ${order.orderCode}`,
     vnp_OrderType: "other",
     vnp_Amount: Math.round(order.total * 100), // ✅ VNPay yêu cầu x100

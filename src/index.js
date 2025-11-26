@@ -39,18 +39,39 @@ connectDB();
 const app = express();
 
 // === CSP FOR VNPAY ===
-app.use(
-  helmet.contentSecurityPolicy({
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://sandbox.vnpayment.vn", "https://pay.vnpayment.vn"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://sandbox.vnpayment.vn", "https://pay.vnpayment.vn"],
-      imgSrc: ["'self'", "data:", "https://sandbox.vnpayment.vn", "https://pay.vnpayment.vn"],
-      frameSrc: ["https://sandbox.vnpayment.vn", "https://pay.vnpayment.vn"],
-      connectSrc: ["'self'", "https://sandbox.vnpayment.vn", "https://pay.vnpayment.vn"]
-    }
-  })
-);
+app.use("/api/payment/vnpay", helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: [
+      "'self'",
+      "'unsafe-inline'",
+      "'unsafe-eval'",
+      "https://sandbox.vnpayment.vn",
+      "https://pay.vnpayment.vn"
+    ],
+    styleSrc: [
+      "'self'",
+      "'unsafe-inline'",
+      "https://sandbox.vnpayment.vn",
+      "https://pay.vnpayment.vn"
+    ],
+    imgSrc: [
+      "'self'",
+      "data:",
+      "https://sandbox.vnpayment.vn",
+      "https://pay.vnpayment.vn"
+    ],
+    frameSrc: [
+      "https://sandbox.vnpayment.vn",
+      "https://pay.vnpayment.vn"
+    ],
+    connectSrc: [
+      "'self'",
+      "https://sandbox.vnpayment.vn",
+      "https://pay.vnpayment.vn"
+    ]
+  }
+}));
 
 const PORT = process.env.PORT || 3000;
 
