@@ -30,6 +30,7 @@ const bannerRoutes = require("./routes/banner");
 const mainCategoryRoutes = require("./routes/mainCategories");
 const paymentRoutes = require("./routes/payment")
 const footerRoutes = require("./routes/footer")
+const stripeRoutes = require("./routes/stripe");
 // === CONTROLLER ===
 const dashboardController = require("./controllers/dashboardController");
 
@@ -71,6 +72,21 @@ app.use("/api/payment/vnpay", helmet.contentSecurityPolicy({
       "https://pay.vnpayment.vn"
     ]
   }
+}));
+app.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: [
+      "'self'",
+      "'unsafe-inline'",
+      "https://www.paypal.com",
+      "https://www.sandbox.paypal.com"
+    ],
+    frameSrc: [
+      "https://www.paypal.com",
+      "https://www.sandbox.paypal.com"
+    ],
+  },
 }));
 
 const PORT = process.env.PORT || 3000;
@@ -162,6 +178,7 @@ app.use("/api/footer", footerRoutes)
 // === ADMIN ROUTES ===
 app.use("/admin", authRoutes);
 app.get("/admin/dashboard/:section", requireAdmin, dashboardController.renderSection);
+app.use("/api/stripe", stripeRoutes);
 
 // === FILE TEMPLATE DOWNLOAD ===
 const templatePath = path.join(__dirname, "public/templates");

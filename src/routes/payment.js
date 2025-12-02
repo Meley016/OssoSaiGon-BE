@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const { apiProtect } = require("../middlewares/auth");
-
+const paypalController = require("../controllers/paypalController");
 const paymentController = require("../controllers/paymentController");
 const vnpayController = require("../controllers/vnpayController");
-// const paypalController = require("../controllers/paypalController");
+const stripeController = require("../controllers/stripeController");
 
 // 🟢 Thanh toán tổng hợp (tùy phương thức)
 router.post("/create", apiProtect, paymentController.createPayment);
@@ -15,8 +15,16 @@ router.get("/vnpay-return", vnpayController.vnpayReturn); // ✅ returnUrl (redi
 router.get("/vnpay-ipn", vnpayController.vnpayIPN); // ✅ ipnUrl (VNPay gọi server)
 
 // ================== PayPal ==================
-// router.post("/paypal", apiProtect, paypalController.createPayment);
-// router.get("/paypal/success", paypalController.success);
-// router.get("/paypal/cancel", paypalController.cancel);
+router.get("/paypal", paypalController.createPaypalPayment);
+router.get("/paypal/success", paypalController.capturePaypal);
+router.get("/paypal/cancel", (req, res) => {
+  res.redirect(`${process.env.CLIENT_URL}/payment-failed`);
+});
 
+// ================== Stripe ==================
+// Tạo PaymentIntent
+router.post("/create-payment-intent", apiProtect, stripeController.createPaymentIntent);
+
+// Stripe webhook (Stripe gọi)
+router.post("/webhook", express.raw({ type: "application/json" }), stripeController.handleWebhook);
 module.exports = router;
