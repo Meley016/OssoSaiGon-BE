@@ -4,6 +4,7 @@ const Product = require("../models/Product");
 const { User } = require("../models/User");
 const Promotion = require("../models/Promotion");
 const { createVNPayUrl } = require("./vnpayController");
+const Cart = require("../models/Cart");
 
 async function releaseStock(order) {
   for (const it of order.items) {

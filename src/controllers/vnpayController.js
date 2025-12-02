@@ -235,7 +235,7 @@ exports.vnpayIPN = async (req, res) => {
       order.vnpayTransactionNo = vnpParams["vnp_TransactionNo"];
       order.vnpayResponseCode = vnpParams["vnp_ResponseCode"];
 
-      await finalizeOrder(order); // ✅ TRỪ KHO + CỘNG ĐIỂM DUY NHẤT Ở ĐÂY
+      await finalizeOrder(order); // TRỪ KHO + CỘNG ĐIỂM DUY NHẤT Ở ĐÂY
       await order.save();
     } else {
       order.status = "cancelled";

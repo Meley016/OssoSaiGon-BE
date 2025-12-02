@@ -14,10 +14,12 @@
   "type": "commonjs",
   "dependencies": {
     "@emailjs/nodejs": "^5.0.2",
+    "@paypal/checkout-server-sdk": "^1.0.3",
     "antd": "^5.27.5",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
+    "body-parser": "^2.2.1",
     "chroma-js": "^3.1.2",
     "cloudinary": "^1.41.3",
     "connect-mongo": "^5.1.0",
@@ -45,6 +47,7 @@
     "nodemailer": "^7.0.10",
     "react-router-dom": "^7.8.2",
     "slugify": "^1.6.6",
+    "stripe": "^20.0.0",
     "vnpay": "^2.4.4",
     "xlsx": "^0.18.5"
   }
