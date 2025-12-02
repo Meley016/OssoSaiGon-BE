@@ -30,7 +30,7 @@ const bannerRoutes = require("./routes/banner");
 const mainCategoryRoutes = require("./routes/mainCategories");
 const paymentRoutes = require("./routes/payment")
 const footerRoutes = require("./routes/footer")
-const stripeRoutes = require("./routes/stripe");
+const stripeRoutes = require("./routes/payment");
 // === CONTROLLER ===
 const dashboardController = require("./controllers/dashboardController");
 
@@ -122,6 +122,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use(cors(corsOptions));
+app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
