@@ -11,6 +11,7 @@ const cancelExpiredOrders = require("./utils/cancelExpired");
 
 const connectDB = require("./config/database");
 const MongoStore = require("connect-mongo");
+
 // === ROUTES ===
 const authRoutes = require("./routes/auth");
 const productRoutes = require("./routes/products");
@@ -28,9 +29,9 @@ const statisticsRoutes = require("./routes/statistics");
 const blogRoutes = require("./routes/blogs");
 const bannerRoutes = require("./routes/banner");
 const mainCategoryRoutes = require("./routes/mainCategories");
-const paymentRoutes = require("./routes/payment")
-const footerRoutes = require("./routes/footer")
-const stripeRoutes = require("./routes/payment");
+const paymentRoutes = require("./routes/payment");
+const footerRoutes = require("./routes/footer");
+
 // === CONTROLLER ===
 const dashboardController = require("./controllers/dashboardController");
 
@@ -38,69 +39,86 @@ const dashboardController = require("./controllers/dashboardController");
 connectDB();
 
 const app = express();
-
-// === CSP FOR VNPAY ===
-app.use("/api/payment/vnpay", helmet.contentSecurityPolicy({
-  directives: {
-    defaultSrc: ["'self'"],
-    scriptSrc: [
-      "'self'",
-      "'unsafe-inline'",
-      "'unsafe-eval'",
-      "https://sandbox.vnpayment.vn",
-      "https://pay.vnpayment.vn"
-    ],
-    styleSrc: [
-      "'self'",
-      "'unsafe-inline'",
-      "https://sandbox.vnpayment.vn",
-      "https://pay.vnpayment.vn"
-    ],
-    imgSrc: [
-      "'self'",
-      "data:",
-      "https://sandbox.vnpayment.vn",
-      "https://pay.vnpayment.vn"
-    ],
-    frameSrc: [
-      "https://sandbox.vnpayment.vn",
-      "https://pay.vnpayment.vn"
-    ],
-    connectSrc: [
-      "'self'",
-      "https://sandbox.vnpayment.vn",
-      "https://pay.vnpayment.vn"
-    ]
-  }
-}));
-app.use(helmet.contentSecurityPolicy({
-  directives: {
-    defaultSrc: ["'self'"],
-    scriptSrc: [
-      "'self'",
-      "'unsafe-inline'",
-      "https://www.paypal.com",
-      "https://www.sandbox.paypal.com"
-    ],
-    frameSrc: [
-      "https://www.paypal.com",
-      "https://www.sandbox.paypal.com"
-    ],
-  },
-}));
-
 const PORT = process.env.PORT || 3000;
 
+// GLOBAL CSP (cho toàn app)
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'", "https://res.cloudinary.com"],
 
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "'unsafe-eval'",
+        "https://js.stripe.com",
+        "https://www.paypal.com",
+        "https://www.sandbox.paypal.com",
+        "https://sandbox.vnpayment.vn",
+        "https://pay.vnpayment.vn",
+        "https://cdn.quilljs.com",
+        "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
+      ],
+
+      frameSrc: [
+        "https://js.stripe.com",
+        "https://www.paypal.com",
+        "https://www.sandbox.paypal.com",
+        "https://sandbox.vnpayment.vn",
+        "https://pay.vnpayment.vn",
+      ],
+
+      connectSrc: [
+        "'self'",
+        "https://api.stripe.com",
+        "https://checkout.stripe.com",
+        "https://api-m.paypal.com",
+        "https://api.sandbox.paypal.com",
+        "https://sandbox.vnpayment.vn",
+        "https://pay.vnpayment.vn",
+        "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
+      ],
+
+      imgSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://res.cloudinary.com",
+        "https://*.stripe.com",
+        "https://www.paypal.com",
+        "https://www.sandbox.paypal.com",
+        "https://sandbox.vnpayment.vn",
+        "https://pay.vnpayment.vn",
+      ],
+
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://js.stripe.com",
+        "https://sandbox.vnpayment.vn",
+        "https://pay.vnpayment.vn",
+        "https://cdn.quilljs.com",
+        "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
+      ],
+
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+    },
+  })
+);
+
+/* =============================
+   ✅ CORS CHUẨN CHO PAYMENT
+============================= */
 const allowedOrigins = [
   "https://ososaigon.com",
   "http://localhost:5173",
   "https://ososaigon-user.vercel.app",
   "http://localhost:3000",
-  "https://ososaigon-admin.onrender.com", // THÊM URL RENDER (sẽ thay sau)
+  "https://ososaigon-admin.onrender.com",
 ];
-
-cron.schedule("*/5 * * * *", cancelExpiredOrders); // mỗi 5 phút tự động hủy đơn tạm hết hạn
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -113,24 +131,35 @@ const corsOptions = {
   },
   credentials: true,
 };
-// === SETUP VIEW ENGINE ===
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
-
-// === STATIC FILES ===
-app.use(express.static(path.join(__dirname, "public")));
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use(cors(corsOptions));
+
+/* =============================
+   ✅ WEBHOOK STRIPE PHẢI ĐẶT TRƯỚC JSON
+============================= */
 app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
+
+/* =============================
+   ✅ BODY PARSER SAU WEBHOOK
+============================= */
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
- 
-// === SESSION: DÙNG CHO ADMIN PANEL ===
-app.set("trust proxy", 1); // ✅ BẮT BUỘC CHO HTTPS (Render)
 
-app.use( 
+/* =============================
+   ✅ STATIC FILE
+============================= */
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+/* =============================
+   ✅ SESSION CHUẨN HTTPS (ADMIN)
+============================= */
+app.set("trust proxy", 1);
+
+app.use(
   session({
     secret: process.env.SESSION_SECRET || "your-session-secret-key-2025",
     resave: false,
@@ -142,13 +171,21 @@ app.use(
     }),
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // ✅ cookie chỉ gửi qua HTTPS
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // ✅ cho phép FE khác domain
-      maxAge: 24 * 60 * 60 * 1000, // 1 ngày
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 24 * 60 * 60 * 1000,
     },
   })
 );
-// === ADMIN MIDDLEWARE ===
+
+/* =============================
+   ✅ CRON HỦY ĐƠN HẾT HẠN
+============================= */
+cron.schedule("*/5 * * * *", cancelExpiredOrders);
+
+/* =============================
+   ✅ ADMIN MIDDLEWARE
+============================= */
 const requireAdmin = (req, res, next) => {
   if (!req.session.admin) {
     return res.redirect("/admin/login");
@@ -156,8 +193,9 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-
-// === API ROUTES ===
+/* =============================
+   ✅ API ROUTES
+============================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/products", productRoutes);
@@ -172,16 +210,26 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/statistics", statisticsRoutes);
 app.use("/api/blogs", blogRoutes);
-app.use("/api/banners", bannerRoutes); // ĐÃ SỬA: "banners" không phải "banner"
+app.use("/api/banners", bannerRoutes);
 app.use("/api/main-categories", mainCategoryRoutes);
+
+/* =============================
+   ✅ ROUTE PAYMENT ĐƯỢC BỌC CSP RIÊNG
+============================= */
 app.use("/api/payment", paymentRoutes);
-app.use("/api/footer", footerRoutes)
-// === ADMIN ROUTES ===
+app.use("/api/stripe", paymentRoutes);
+
+app.use("/api/footer", footerRoutes);
+
+/* =============================
+   ✅ ADMIN ROUTES
+============================= */
 app.use("/admin", authRoutes);
 app.get("/admin/dashboard/:section", requireAdmin, dashboardController.renderSection);
-app.use("/api/stripe", stripeRoutes);
 
-// === FILE TEMPLATE DOWNLOAD ===
+/* =============================
+   ✅ FILE DOWNLOAD
+============================= */
 const templatePath = path.join(__dirname, "public/templates");
 app.get("/templates/:file", (req, res) => {
   const file = path.join(templatePath, req.params.file);
@@ -190,29 +238,38 @@ app.get("/templates/:file", (req, res) => {
     : res.status(404).send("Không tìm thấy file!");
 });
 
-// === ROOT REDIRECT ===
+/* =============================
+   ✅ ROOT
+============================= */
 app.get("/", (req, res) => {
   req.session.admin
     ? res.redirect("/admin/dashboard/product")
     : res.redirect("/admin/login");
 });
 
-// === 404 HANDLER ===
+/* =============================
+   ✅ 404 HANDLER
+============================= */
 app.use((req, res) => {
   const isHTML = req.headers.accept?.includes("text/html");
   if (isHTML) return res.render("admin/404", { title: "404" });
   res.status(404).json({ error: "Không tìm thấy route!" });
 });
 
-// === GLOBAL ERROR HANDLER ===
+/* =============================
+   ✅ GLOBAL ERROR
+============================= */
 app.use((err, req, res, next) => {
   console.error("GLOBAL ERROR:", err);
   if (res.headersSent) return next(err);
-  res
-  .status(err.status || 500)
-  .json({ error: err.message || "Server Error!" });
+  res.status(err.status || 500).json({
+    error: err.message || "Server Error!",
+  });
 });
 
+/* =============================
+   ✅ SERVER START
+============================= */
 const server = app.listen(PORT, "0.0.0.0", () => {
   const port = server.address().port;
   console.log(`Server đang chạy tại: http://localhost:${port}`);
