@@ -42,115 +42,115 @@ const finalizeOrder = async (order) => {
 };
 
 // API DUY NHẤT DÙNG CHO CHECKOUT
-exports.preCreateOrder = async (req, res) => {
-  const session = await Order.startSession();
-  session.startTransaction();
+// exports.preCreateOrder = async (req, res) => {
+//   const session = await Order.startSession();
+//   session.startTransaction();
 
-  try {
-    const { paymentMethod, shippingAddress, items, promotionId } = req.body;
-    const userId = req.user._id;
+//   try {
+//     const { paymentMethod, shippingAddress, items, promotionId } = req.body;
+//     const userId = req.user._id;
 
-    // === VALIDATE GIỮ NGUYÊN 100% TỪ CODE CŨ CỦA BẠN ===
-    if (!userId || !paymentMethod || !shippingAddress || !items?.length) {
-      return res.status(400).json({ error: "Thiếu thông tin bắt buộc" });
-    }
+//     // === VALIDATE GIỮ NGUYÊN 100% TỪ CODE CŨ CỦA BẠN ===
+//     if (!userId || !paymentMethod || !shippingAddress || !items?.length) {
+//       return res.status(400).json({ error: "Thiếu thông tin bắt buộc" });
+//     }
 
-    const user = await User.findById(userId);
-    if (!user) return res.status(400).json({ error: "User không tồn tại" });
+//     const user = await User.findById(userId);
+//     if (!user) return res.status(400).json({ error: "User không tồn tại" });
 
-    let subtotal = 0;
-    const orderItems = [];
+//     let subtotal = 0;
+//     const orderItems = [];
 
-    for (const it of items) {
-      const product = await Product.findById(it.productId);
-      if (!product) return res.status(400).json({ error: `Sản phẩm ${it.productId} không tồn tại` });
+//     for (const it of items) {
+//       const product = await Product.findById(it.productId);
+//       if (!product) return res.status(400).json({ error: `Sản phẩm ${it.productId} không tồn tại` });
 
-      const variant = product.variants.find(v => v.sku === it.sku);
-      if (!variant) return res.status(400).json({ error: `SKU ${it.sku} không tồn tại` });
-      if (variant.stockQuantity < it.quantity) return res.status(400).json({ error: `Không đủ hàng SKU ${it.sku}` });
+//       const variant = product.variants.find(v => v.sku === it.sku);
+//       if (!variant) return res.status(400).json({ error: `SKU ${it.sku} không tồn tại` });
+//       if (variant.stockQuantity < it.quantity) return res.status(400).json({ error: `Không đủ hàng SKU ${it.sku}` });
 
-      const price = it.price || variant.price;
-      subtotal += price * it.quantity;
+//       const price = it.price || variant.price;
+//       subtotal += price * it.quantity;
 
-      orderItems.push({
-        productId: product._id,
-        sku: variant.sku,
-        quantity: it.quantity,
-        price,
-        variantInfo: {
-          color: variant.color,
-          size: variant.size,
-          coverImage: variant.coverImage,
-          images: variant.images || [],
-        },
-      });
-    }
+//       orderItems.push({
+//         productId: product._id,
+//         sku: variant.sku,
+//         quantity: it.quantity,
+//         price,
+//         variantInfo: {
+//           color: variant.color,
+//           size: variant.size,
+//           coverImage: variant.coverImage,
+//           images: variant.images || [],
+//         },
+//       });
+//     }
 
-    // Promotion
-    let discount = 0;
-    if (promotionId) {
-      const promo = await Promotion.findById(promotionId);
-      if (promo?.isActive) {
-        if (promo.type === "percentage") {
-          discount = Math.min(subtotal * (promo.value / 100), promo.maxDiscount || Infinity);
-        } else if (promo.type === "fixed") {
-          discount = Math.min(promo.value, subtotal);
-        }
-      }
-    }
+//     // Promotion
+//     let discount = 0;
+//     if (promotionId) {
+//       const promo = await Promotion.findById(promotionId);
+//       if (promo?.isActive) {
+//         if (promo.type === "percentage") {
+//           discount = Math.min(subtotal * (promo.value / 100), promo.maxDiscount || Infinity);
+//         } else if (promo.type === "fixed") {
+//           discount = Math.min(promo.value, subtotal);
+//         }
+//       }
+//     }
 
-    const total = subtotal - discount;
+//     const total = subtotal - discount;
 
-    // Tạo đơn tạm
-    const order = await Order.create([{
-      userId,
-      paymentMethod,
-      shippingAddress,
-      items: orderItems,
-      subtotal,
-      discount,
-      total,
-      promotionId: promotionId || null,
-      status: "pending",
-      isTemporary: true,
-    }], { session });
+//     // Tạo đơn tạm
+//     const order = await Order.create([{
+//       userId,
+//       paymentMethod,
+//       shippingAddress,
+//       items: orderItems,
+//       subtotal,
+//       discount,
+//       total,
+//       promotionId: promotionId || null,
+//       status: "pending",
+//       isTemporary: true,
+//     }], { session });
 
-    const createdOrder = order[0];
+//     const createdOrder = order[0];
 
-    // COD hoặc Bank → finalize ngay
-    if (paymentMethod !== "vnpay") {
-      createdOrder.status = "preparing";
-      createdOrder.isTemporary = false;
-      await finalizeOrder(createdOrder);
-      await createdOrder.save({ session });
-      await session.commitTransaction();
+//     // COD hoặc Bank → finalize ngay
+//     if (paymentMethod !== "vnpay") {
+//       createdOrder.status = "preparing";
+//       createdOrder.isTemporary = false;
+//       await finalizeOrder(createdOrder);
+//       await createdOrder.save({ session });
+//       await session.commitTransaction();
 
-      return res.json({
-        success: true,
-        order: createdOrder,
-        redirectUrl: `/payment-success/${createdOrder._id}`
-      });
-    }
+//       return res.json({
+//         success: true,
+//         order: createdOrder,
+//         redirectUrl: `/payment-success/${createdOrder._id}`
+//       });
+//     }
 
-    // VNPay → chỉ trả URL
-    await session.commitTransaction();
-    const vnpayUrl = await createVNPayUrl(createdOrder, req);
+//     // VNPay → chỉ trả URL
+//     await session.commitTransaction();
+//     const vnpayUrl = await createVNPayUrl(createdOrder, req);
 
-    res.json({
-      success: true,
-      order: createdOrder,
-      vnpayUrl,
-      redirectUrl: "/payment-processing"
-    });
+//     res.json({
+//       success: true,
+//       order: createdOrder,
+//       vnpayUrl,
+//       redirectUrl: "/payment-processing"
+//     });
 
-  } catch (err) {
-    await session.abortTransaction();
-    console.error("preCreateOrder error:", err);
-    res.status(500).json({ error: err.message || "Lỗi tạo đơn" });
-  } finally {
-    session.endSession();
-  }
-};
+//   } catch (err) {
+//     await session.abortTransaction();
+//     console.error("preCreateOrder error:", err);
+//     res.status(500).json({ error: err.message || "Lỗi tạo đơn" });
+//   } finally {
+//     session.endSession();
+//   }
+// };
 
 exports.createOrder = async (req, res) => {
   try {
