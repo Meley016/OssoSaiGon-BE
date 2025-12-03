@@ -611,3 +611,37 @@ exports.cancelOrder = async (req, res) => {
     res.status(500).json({ error: "Lỗi hủy đơn hàng" });
   }
 };
+exports.getOrderByIdForUser = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate("items.variantInfo.color", "name")
+      .populate("items.variantInfo.size", "name")
+      .lean();
+
+    if (!order) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+
+    // Chỉ trả nếu user là chủ đơn
+    if (order.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: "Bạn không có quyền xem đơn hàng này" });
+    }
+
+    res.json({ order });
+  } catch (err) {
+    console.error("getOrderByIdForUser error:", err);
+    res.status(500).json({ error: "Lỗi tải đơn hàng" });
+  }
+};
+exports.getOrdersForUser = async (req, res) => {
+  try {
+    const orders = await Order.find({ userId: req.user._id })
+      .populate("items.variantInfo.color", "name")
+      .populate("items.variantInfo.size", "name")
+      .populate("promotionId", "code name")
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ orders });
+  } catch (err) {
+    console.error("getOrdersForUser error:", err);
+    res.status(500).json({ error: "Lỗi tải danh sách đơn của bạn" });
+  }
+};

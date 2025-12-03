@@ -561,7 +561,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Nút thêm biến thể mới
       const btnAdd = document.getElementById("edit-addVariant");
-      btnAdd.onclick = () => addNewVariantInEdit(body);
+      btnAdd.onclick = () => addVariantRow(document.getElementById("editVariantBody"), {}, false);
 
       document.getElementById('editModal').style.display = 'block';
     } catch (err) {

@@ -22,6 +22,7 @@
     "body-parser": "^2.2.1",
     "chroma-js": "^3.1.2",
     "cloudinary": "^1.41.3",
+    "compression": "^1.8.1",
     "connect-mongo": "^5.1.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
