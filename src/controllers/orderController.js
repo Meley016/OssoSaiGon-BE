@@ -69,6 +69,7 @@ exports.preCreateOrder = async (req, res) => {
 
       orderItems.push({
         productId: product._id,
+        productName: product.name,
         sku: variant.sku,
         quantity: it.quantity,
         price,
@@ -213,6 +214,7 @@ exports.createOrder = async (req, res) => {
 
       orderItems.push({
         productId: product._id,
+        productName: product.name,
         sku: variant.sku,
         quantity: qty,
         price,
@@ -610,7 +612,7 @@ exports.cancelOrder = async (req, res) => {
 };
 exports.getOrderByIdForUser = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
+    const order = await Order.findById(req.params.orderId) 
       .populate("items.variantInfo.color", "name")
       .populate("items.variantInfo.size", "name")
       .lean();
