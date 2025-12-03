@@ -5,6 +5,7 @@ const path = require("path");
 const fs = require("fs");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
+const compression = require("compression"); // ✅ NÉN GZIP TỐI ƯU TỐC ĐỘ
 require("dotenv").config();
 const cron = require("node-cron");
 const cancelExpiredOrders = require("./utils/cancelExpired");
@@ -41,121 +42,120 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// GLOBAL CSP (cho toàn app)
+/* =============================
+   ✅ HELMET + CSP
+============================= */
+const publicCSP = helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'", "https://res.cloudinary.com"],
+    scriptSrc: [
+      "'self'",
+      "'unsafe-inline'",
+      "'unsafe-eval'",
+      "https://js.stripe.com",
+      "https://www.paypal.com",
+      "https://www.sandbox.paypal.com",
+      "https://sandbox.vnpayment.vn",
+      "https://pay.vnpayment.vn",
+      "https://cdn.quilljs.com",
+      "https://cdn.jsdelivr.net",
+      "https://cdnjs.cloudflare.com",
+    ],
+    frameSrc: [
+      "https://js.stripe.com",
+      "https://www.paypal.com",
+      "https://www.sandbox.paypal.com",
+      "https://sandbox.vnpayment.vn",
+      "https://pay.vnpayment.vn",
+    ],
+    connectSrc: [
+      "'self'",
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://ososaigon.com",
+      "https://ososaigon-user.vercel.app",
+      "https://ososaigon-admin.onrender.com",
+      "https://api.stripe.com",
+      "https://checkout.stripe.com",
+      "https://api-m.paypal.com",
+      "https://api.sandbox.paypal.com",
+      "https://sandbox.vnpayment.vn",
+      "https://pay.vnpayment.vn",
+      "https://cdn.jsdelivr.net",
+      "https://cdnjs.cloudflare.com",
+    ],
+    imgSrc: [
+      "'self'",
+      "data:",
+      "blob:",
+      "https://res.cloudinary.com",
+      "https://*.stripe.com",
+      "https://www.paypal.com",
+      "https://www.sandbox.paypal.com",
+      "https://sandbox.vnpayment.vn",
+      "https://pay.vnpayment.vn",
+    ],
+    styleSrc: [
+      "'self'",
+      "'unsafe-inline'",
+      "https://js.stripe.com",
+      "https://sandbox.vnpayment.vn",
+      "https://pay.vnpayment.vn",
+      "https://cdn.quilljs.com",
+      "https://cdn.jsdelivr.net",
+      "https://cdnjs.cloudflare.com",
+    ],
+    fontSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+  },
+});
+
+// Áp dụng CSP cho payment route
+app.use("/api/payment", publicCSP);
+app.use("/api/stripe", publicCSP);
+/* =============================
+   ✅ CORS ỔN ĐỊNH – KHÔNG BLOCK NGẦM
+============================= */
 app.use(
-  helmet.contentSecurityPolicy({
-    directives: {
-      defaultSrc: ["'self'", "https://res.cloudinary.com"],
-
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "'unsafe-eval'",
-        "https://js.stripe.com",
-        "https://www.paypal.com",
-        "https://www.sandbox.paypal.com",
-        "https://sandbox.vnpayment.vn",
-        "https://pay.vnpayment.vn",
-        "https://cdn.quilljs.com",
-        "https://cdn.jsdelivr.net",
-        "https://cdnjs.cloudflare.com",
-      ],
-
-      frameSrc: [
-        "https://js.stripe.com",
-        "https://www.paypal.com",
-        "https://www.sandbox.paypal.com",
-        "https://sandbox.vnpayment.vn",
-        "https://pay.vnpayment.vn",
-      ],
-
-      connectSrc: [
-        "'self'",
-        "https://api.stripe.com",
-        "https://checkout.stripe.com",
-        "https://api-m.paypal.com",
-        "https://api.sandbox.paypal.com",
-        "https://sandbox.vnpayment.vn",
-        "https://pay.vnpayment.vn",
-        "https://cdn.jsdelivr.net",
-        "https://cdnjs.cloudflare.com",
-      ],
-
-      imgSrc: [
-        "'self'",
-        "data:",
-        "blob:",
-        "https://res.cloudinary.com",
-        "https://*.stripe.com",
-        "https://www.paypal.com",
-        "https://www.sandbox.paypal.com",
-        "https://sandbox.vnpayment.vn",
-        "https://pay.vnpayment.vn",
-      ],
-
-      styleSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "https://js.stripe.com",
-        "https://sandbox.vnpayment.vn",
-        "https://pay.vnpayment.vn",
-        "https://cdn.quilljs.com",
-        "https://cdn.jsdelivr.net",
-        "https://cdnjs.cloudflare.com",
-      ],
-
-      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
-    },
+  cors({
+    origin: true,
+    credentials: true,
   })
 );
 
 /* =============================
-   ✅ CORS CHUẨN CHO PAYMENT
+   ✅ NÉN RESPONSE – GIẢM LOAD 60–80%
 ============================= */
-const allowedOrigins = [
-  "https://ososaigon.com",
-  "http://localhost:5173",
-  "https://ososaigon-user.vercel.app",
-  "http://localhost:3000",
-  "https://ososaigon-admin.onrender.com",
-];
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`❌ Blocked by CORS: ${origin}`);
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-};
-
-app.use(cors(corsOptions));
+app.use(compression());
 
 /* =============================
-   ✅ WEBHOOK STRIPE PHẢI ĐẶT TRƯỚC JSON
+   ✅ STRIPE WEBHOOK
 ============================= */
 app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
 
 /* =============================
-   ✅ BODY PARSER SAU WEBHOOK
+   ✅ BODY PARSER
 ============================= */
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 /* =============================
-   ✅ STATIC FILE
+   ✅ STATIC + CACHE
 ============================= */
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
-app.use(express.static(path.join(__dirname, "public")));
+
+app.use(
+  express.static(path.join(__dirname, "public"), {
+    maxAge: "30d",
+    etag: true,
+  })
+);
+
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 /* =============================
-   ✅ SESSION CHUẨN HTTPS (ADMIN)
+   ✅ SESSION
 ============================= */
 app.set("trust proxy", 1);
 
@@ -179,16 +179,18 @@ app.use(
 );
 
 /* =============================
-   ✅ CRON HỦY ĐƠN HẾT HẠN
+   ✅ CRON
 ============================= */
 cron.schedule("*/5 * * * *", cancelExpiredOrders);
 
 /* =============================
-   ✅ ADMIN MIDDLEWARE
+   ✅ ADMIN MIDDLEWARE – KHÔNG CÒN TREO FETCH
 ============================= */
 const requireAdmin = (req, res, next) => {
   if (!req.session.admin) {
-    return res.redirect("/admin/login");
+    return res.status(401).json({
+      error: "Unauthorized – Admin chưa đăng nhập!",
+    });
   }
   next();
 };
@@ -213,12 +215,8 @@ app.use("/api/blogs", blogRoutes);
 app.use("/api/banners", bannerRoutes);
 app.use("/api/main-categories", mainCategoryRoutes);
 
-/* =============================
-   ✅ ROUTE PAYMENT ĐƯỢC BỌC CSP RIÊNG
-============================= */
 app.use("/api/payment", paymentRoutes);
 app.use("/api/stripe", paymentRoutes);
-
 app.use("/api/footer", footerRoutes);
 
 /* =============================
@@ -248,7 +246,7 @@ app.get("/", (req, res) => {
 });
 
 /* =============================
-   ✅ 404 HANDLER
+   ✅ 404
 ============================= */
 app.use((req, res) => {
   const isHTML = req.headers.accept?.includes("text/html");

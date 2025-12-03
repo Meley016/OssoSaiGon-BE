@@ -26,5 +26,5 @@ router.get("/paypal/cancel", (req, res) => {
 router.post("/create-payment-intent", apiProtect, stripeController.createPaymentIntent);
 
 // Stripe webhook (Stripe gọi)
-router.post("/webhook", express.raw({ type: "application/json" }), stripeController.handleWebhook);
+router.post("/webhook", stripeController.handleWebhook);
 module.exports = router;
