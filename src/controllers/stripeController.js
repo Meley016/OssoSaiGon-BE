@@ -93,7 +93,7 @@ exports.handleWebhook = async (req, res) => {
 
         order.status = "completed";
         order.isTemporary = false;
-        order.reserveExpiresAt = null;
+        
         order.paymentIntentId = paymentIntent.id;
         await order.save();
         await finalizeOrder(order);
