@@ -52,55 +52,85 @@ exports.preCreateOrder = async (req, res) => {
     if (!paymentMethod || !shippingAddress || !items?.length)
       return res.status(400).json({ error: "Thiếu thông tin" });
 
-    // === KIỂM TRA & TÍNH LẠI TỪ DB (CHỐNG HACK GIÁ) ===
+    // ===============================
+    // ✅ 1. TÍNH SUBTOTAL TỪ DB (CHỐNG HACK)
+    // ===============================
     let subtotal = 0;
     const orderItems = [];
 
     for (const it of items) {
       const product = await Product.findById(it.productId);
-      if (!product) return res.status(400).json({ error: `Sản phẩm ${it.productId} không tồn tại` });
+      if (!product) {
+        return res.status(400).json({ error: `Sản phẩm ${it.productId} không tồn tại` });
+      }
 
       const variant = product.variants.find(v => v.sku === it.sku);
-      if (!variant) return res.status(400).json({ error: `SKU ${it.sku} không tồn tại` });
-      if (variant.stockQuantity < it.quantity) return res.status(400).json({ error: `Hết hàng: ${it.sku}` });
+      if (!variant) {
+        return res.status(400).json({ error: `SKU ${it.sku} không tồn tại` });
+      }
 
-      const price = variant.price; // luôn lấy từ DB
-      subtotal += price * it.quantity;
+      if (variant.stockQuantity < it.quantity) {
+        return res.status(400).json({ error: `Hết hàng: ${it.sku}` });
+      }
+
+      const price = Number(variant.price) || 0;
+      const qty = Number(it.quantity) || 0;
+
+      subtotal += price * qty;
 
       orderItems.push({
         productId: product._id,
         productName: product.name,
         sku: variant.sku,
-        quantity: it.quantity,
+        quantity: qty,
         price,
-        variantInfo: { color: variant.color, size: variant.size, coverImage: variant.coverImage },
+        variantInfo: {
+          color: variant.color,
+          size: variant.size,
+          coverImage: variant.coverImage,
+        },
       });
     }
 
-    // === ÁP DỤNG MÃ GIẢM GIÁ ===
+    // ===============================
+    // ✅ 2. TÍNH DISCOUNT
+    // ===============================
     let discount = 0;
     if (promotionId) {
       const promo = await Promotion.findById(promotionId);
       if (promo?.isActive) {
-        if (promo.type === "percentage")
+        if (promo.type === "percentage") {
           discount = Math.min(subtotal * (promo.value / 100), promo.maxDiscount || Infinity);
-        else if (promo.type === "fixed")
+        } else if (promo.type === "fixed") {
           discount = Math.min(promo.value, subtotal);
+        }
       }
     }
 
-    const total = subtotal - discount;
+    // ===============================
+    // ✅ 3. CỘNG VAT 8% – TÍNH TOTAL SAU THUẾ
+    // ===============================
+    const vat = subtotal * 0.08;
+    const total = subtotal + vat - discount;
+
+    if (total <= 0) {
+      return res.status(400).json({ error: "Tổng tiền không hợp lệ" });
+    }
+
     const isAutoFinalize = ["cod", "bank_transfer"].includes(paymentMethod);
 
-    // === TẠO ĐƠN HÀNG ===
+    // ===============================
+    // ✅ 4. TẠO ĐƠN HÀNG
+    // ===============================
     const order = await Order.create([{
       userId,
       paymentMethod,
       shippingAddress,
       items: orderItems,
       subtotal,
+      vat,            // ✅ LƯU VAT
       discount,
-      total,
+      total,          // ✅ TOTAL SAU THUẾ
       promotionId: promotionId || null,
       status: "pending",
       isTemporary: !isAutoFinalize,
@@ -109,10 +139,13 @@ exports.preCreateOrder = async (req, res) => {
 
     const createdOrder = order[0];
 
-    // === COD / CHUYỂN KHOẢN → FINALIZE NGAY ===
+    // ===============================
+    // ✅ 5. COD / BANK → FINALIZE NGAY
+    // ===============================
     if (isAutoFinalize) {
       createdOrder.status = "preparing";
       createdOrder.isTemporary = false;
+
       await finalizeOrder(createdOrder);
       await createdOrder.save({ session });
       await session.commitTransaction();
@@ -121,29 +154,33 @@ exports.preCreateOrder = async (req, res) => {
         success: true,
         order: createdOrder,
         finalized: true,
-        redirectUrl: `/order-success/${createdOrder._id}`
+        redirectUrl: `/order-success/${createdOrder._id}`,
       });
     }
 
     await session.commitTransaction();
 
-    // === VNPAY ===
+    // ===============================
+    // ✅ 6. VNPAY
+    // ===============================
     if (paymentMethod === "vnpay") {
       const vnpayUrl = await createVNPayUrl(createdOrder, req);
       return res.json({ success: true, order: createdOrder, vnpayUrl });
     }
 
-    // === STRIPE → trả về orderId để frontend gọi create-payment-intent ===
+    // ===============================
+    // ✅ 7. STRIPE → TRẢ orderId
+    // ===============================
     return res.json({
       success: true,
       order: createdOrder,
       orderId: createdOrder._id,
-      requireStripe: true
+      requireStripe: true,
     });
 
   } catch (err) {
     await session.abortTransaction();
-    console.error(err);
+    console.error("preCreateOrder error:", err);
     res.status(500).json({ error: err.message || "Lỗi tạo đơn hàng" });
   } finally {
     session.endSession();
@@ -431,6 +468,7 @@ exports.updateOrder = async (req, res) => {
         subtotal += price * item.quantity;
         newOrderItems.push({
           productId: item.productId,
+          productName: product.name,
           sku: item.sku,
           quantity: item.quantity,
           price,
