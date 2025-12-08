@@ -10,6 +10,8 @@ exports.createPayment = async (req, res) => {
         return res.json({
           redirectUrl: `/api/payment/paypal?orderId=${orderId}`
         });
+        case "bank_transfer":      // <--- hoặc nếu frontend gửi "banking"
+        return res.json({ success: true, message: "Thanh toán chuyển khoản ngân hàng" });
 
       case "stripe":
         // Gọi endpoint tạo PaymentIntent của Stripe và trả về clientSecret

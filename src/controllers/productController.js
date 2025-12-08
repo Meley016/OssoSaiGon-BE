@@ -203,99 +203,118 @@ exports.getProductById = async (req, res) => {
   }
 };
 
-// === CREATE PRODUCT ===
-// exports.createProduct = async (req, res) => {
-//   try {
-//     const data = req.body;
-//     const { variantImages } = splitFiles(req.files);
-//     const variants = JSON.parse(data.variants || "[]");
+exports.filterProducts = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-//     if (!variants.length) {
-//       return res.status(400).json({ error: "Cần ít nhất 1 biến thể!" });
-//     }
+    const {
+      name,
+      category,
+      brand,
+      minPrice,
+      maxPrice,
+      color,
+      size,
+      minQuantity,
+    } = req.query;
 
-//     // === Base folder Cloudinary (theo tên sản phẩm)
-//     const safeName = data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-//     const baseFolder = `oso/products/${safeName}`;
+    const query = {};
 
-//     // === Map lưu ảnh theo màu (upload 1 lần)
-//     const colorImageMap = {}; // { colorId: [url1, url2...] }
+    // ✅ Tên sản phẩm
+    if (name) query.name = new RegExp(name, "i");
 
-//     for (let i = 0; i < variants.length; i++) {
-//       const v = variants[i];
-//       const files = variantImages[v.color] || [];
+    // ✅ Category
+    if (category) query.category = category;
 
-//       // Nếu màu này chưa upload -> upload lên Cloudinary
-//       if (!colorImageMap[v.color] && files.length) {
-//         const uploadedUrls = [];
+    // ✅ Brand
+    if (brand) query.brand = new RegExp(`^${brand}$`, "i");
 
-//         for (const f of files) {
-//           // Nếu đã là URL Cloudinary (multer-storage-cloudinary) -> dùng luôn
-//           if (f.path && f.path.startsWith("https://res.cloudinary.com")) {
-//             uploadedUrls.push(f.path);
-//             continue;
-//           }
+    // ✅ Variant filters
+    const variantFilter = {};
 
-//           // Nếu là file local (chưa upload) -> upload thủ công
-//           const uploadRes = await cloudinary.uploader.upload(f.path, {
-//             folder: `${baseFolder}/${v.color}`,
-//             unique_filename: true,
-//             overwrite: false,
-//           });
-//           uploadedUrls.push(uploadRes.secure_url);
-//         }
+    if (minPrice || maxPrice) {
+      variantFilter.price = {};
+      if (minPrice) variantFilter.price.$gte = Number(minPrice);
+      if (maxPrice) variantFilter.price.$lte = Number(maxPrice);
+    }
 
-//       } else if (!files.length && !colorImageMap[v.color]) {
-//         // ❌ BỎ: return lỗi này, vì import có thể không có ảnh upload
-//         // return res.status(400).json({ error: `Biến thể ${i + 1} thiếu ảnh!` });
-//         console.warn(`⚠️ Biến thể ${i + 1} chưa có ảnh upload — bỏ qua.`);
-//       }
-//     }
+    if (color) variantFilter.color = color;
+    if (size) variantFilter.size = size;
+    if (minQuantity) variantFilter.stockQuantity = { $gte: Number(minQuantity) };
 
-//     // === Gán ảnh chung cho các variant cùng màu
-//     const finalVariants = [];
-//     for (const v of variants) {
-//       const color = await Color.findById(v.color);
-//       const size = await Size.findById(v.size);
-//       if (!color || !size) continue;
+    if (Object.keys(variantFilter).length > 0) {
+      query.variants = { $elemMatch: variantFilter };
+    }
 
-//       const sharedImages = colorImageMap[v.color] || [];
-//       if (!sharedImages.length) continue;
+    // ✅ Tổng sản phẩm
+    const total = await Product.countDocuments(query);
 
-//       finalVariants.push({
-//         sku: `${data.SKU}-${color.name}-${size.name}`.toUpperCase(),
-//         color: v.color,
-//         size: v.size,
-//         price: Number(v.price),
-//         stockQuantity: Number(v.stock),
-//         importPrice: Number(v.price) * 0.8,
-//         images: sharedImages,
-//         coverImage: sharedImages[0],
-//       });
-//     }
+    // ✅ Lấy sản phẩm
+    const products = await Product.find(query)
+      .populate("category", "name")
+      .populate("variants.color", "name code")
+      .populate("variants.size", "name code")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-//     // === Tạo sản phẩm
-//     const product = await Product.create({
-//       groupId: data.SKU,
-//       name: data.name,
-//       category: data.category,
-//       brand: data.brand,
-//       description: data.description,
-//       variants: finalVariants,
-//     });
+    // ✅ Chuẩn hóa dữ liệu
+    const formatted = products.map((p) => {
+      const variants = p.variants || [];
+      const validVariants = variants.filter(
+        (v) =>
+          (!minPrice || v.price >= minPrice) &&
+          (!maxPrice || v.price <= maxPrice) &&
+          (!color || v.color?._id.toString() === color) &&
+          (!size || v.size?._id.toString() === size) &&
+          (!minQuantity || v.stockQuantity >= minQuantity)
+      );
 
-//     const populated = await Product.findById(product._id)
-//       .populate("category", "name")
-//       .populate("variants.color", "name code")
-//       .populate("variants.size", "name code")
-//       .lean();
+      const minPriceVar = validVariants.length
+        ? Math.min(...validVariants.map((v) => v.price))
+        : 0;
+      const maxPriceVar = validVariants.length
+        ? Math.max(...validVariants.map((v) => v.price))
+        : 0;
 
-//     res.status(201).json(populated);
-//   } catch (err) {
-//     console.error("CREATE ERROR:", err);
-//     res.status(500).json({ error: "Lỗi tạo sản phẩm", details: err.message });
-//   }
-// };
+      const colors = [
+        ...new Map(
+          validVariants.map((v) => [v.color._id.toString(), v.color])
+        ).values(),
+      ];
+
+      const sizes = [
+        ...new Map(validVariants.map((v) => [v.size._id.toString(), v.size])).values(),
+      ];
+
+      return {
+        _id: p._id,
+        name: p.name,
+        coverImage: p.coverImage || variants[0]?.coverImage || "/imgs/placeholder.jpg",
+        minPrice: minPriceVar,
+        maxPrice: maxPriceVar,
+        colors,
+        sizes,
+        variants: validVariants, // Nếu muốn frontend hiển thị chi tiết
+      };
+    });
+
+    res.json({
+      success: true,
+      total,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      data: formatted,
+    });
+  } catch (err) {
+    console.error("FILTER PRODUCTS ERROR:", err);
+    res.status(500).json({ error: "Lỗi lọc sản phẩm", details: err.message });
+  }
+};
+
 exports.createProduct = async (req, res) => {
   try {
     const data = req.body;
