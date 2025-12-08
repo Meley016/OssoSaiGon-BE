@@ -9,6 +9,8 @@ router.get("/", productController.getAllProducts);
 router.get("/search", productController.searchProducts);
 router.get("/:id", productController.getProductById);
 
+router.get("/filter", productController.filterProducts);
+
 router.post("/", protect, requireRole("productAdder", "admin"), upload, productController.createProduct);
 router.put("/:id", protect, requireRole("productAdder", "admin"), upload, productController.updateProduct);
 router.delete("/:id", protect, requireRole("productAdder", "admin"), productController.deleteProduct);

@@ -5,6 +5,7 @@ const { User } = require("../models/User");
 const Promotion = require("../models/Promotion");
 const { createVNPayUrl } = require("./vnpayController");
 const Cart = require("../models/Cart");
+const { sendEmail } = require("../utils/email");
 
 async function releaseStock(order) {
   for (const it of order.items) {
@@ -157,9 +158,32 @@ exports.preCreateOrder = async (req, res) => {
         redirectUrl: `/order-success/${createdOrder._id}`,
       });
     }
-
+    
     await session.commitTransaction();
 
+    if (!["cod", "bank_transfer"].includes(paymentMethod)) {
+      const user = await User.findById(userId);
+      if (user?.email) {
+        (async () => {
+          try {
+            await sendEmail({
+              to: user.email,
+              subject: `Xác nhận đơn hàng ${createdOrder.orderCode}`,
+              templateName: "order-confirmation",
+              variables: {
+                orderCode: createdOrder.orderCode,
+                items: createdOrder.items.map(i => `<li>${i.productName} - ${i.quantity} x ${i.price.toLocaleString()} VND</li>`).join(""),
+                total: createdOrder.total.toLocaleString(),
+                customerName: user.name || "",
+                statusMessage: "thành công",
+              },
+            });
+          } catch (err) {
+            console.error("Gửi mail xác nhận đơn hàng thất bại:", err.message);
+          }
+        })();
+      }
+    }
     // ===============================
     // ✅ 6. VNPAY
     // ===============================

@@ -33,4 +33,12 @@ productSchema.index({ name: "text" });
 // Unique SKU theo từng product group
 productSchema.index({ groupId: 1, "variants.sku": 1 }, { unique: true, sparse: true });
 
+//filter product nhanh ở client
+productSchema.index({
+  "variants.price": 1,
+  "variants.color": 1,
+  "variants.size": 1,
+  "variants.stockQuantity": 1,
+});
+
 module.exports = mongoose.model("Product", productSchema);

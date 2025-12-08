@@ -87,16 +87,34 @@ exports.handleWebhook = async (req, res) => {
         const usdAmount = Math.round((order.total / VND_TO_USD) * 100);
         if (paymentIntent.amount !== usdAmount) {
           order.status = "fraud";
+          order.isTemporary = false;
           await order.save();
           return res.json({ received: true });
         }
 
+        // ✅ finalize order
         order.status = "completed";
         order.isTemporary = false;
-        
         order.paymentIntentId = paymentIntent.id;
         await order.save();
         await finalizeOrder(order);
+
+        // ✅ gửi mail
+        const user = await User.findById(order.userId);
+        if (user?.email) {
+          await sendEmail({
+            to: user.email,
+            subject: `Xác nhận đơn hàng ${order.orderCode}`,
+            templateName: "order-confirmation",
+            variables: {
+              orderCode: order.orderCode,
+              items: order.items.map(i => `<li>${i.productName} - ${i.quantity} x ${i.price.toLocaleString()} VND</li>`).join(""),
+              total: order.total.toLocaleString(),
+              customerName: user.name || "",
+              statusMessage: "thành công",
+            },
+          });
+        }
         break;
 
       case "payment_intent.payment_failed":
