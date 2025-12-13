@@ -5,10 +5,18 @@ const uploadCSV = require("../middlewares/upload");
 const { protect, requireRole } = require("../middlewares/auth");
 const productController = require("../controllers/productController");
 
-router.get("/", productController.getAllProducts);
-router.get("/search", productController.searchProducts);
 
+router.get(
+  "/by-categories",
+  productController.getProductsByCategories
+);
+
+router.get("/brands", productController.getAllBrands);
 router.get("/filter", productController.filterProducts);
+
+router.get("/search", productController.searchProducts);
+router.get("/", productController.getAllProducts);
+
 router.get("/:id", productController.getProductById);
 
 router.post("/", protect, requireRole("productAdder", "admin"), upload, productController.createProduct);

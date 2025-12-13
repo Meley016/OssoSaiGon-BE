@@ -704,3 +704,99 @@ exports.deleteProduct = async (req, res) => {
     res.status(500).json({ error: "Lỗi xóa", details: err.message });
   }
 };
+exports.getAllBrands = async (req, res) => {
+  try {
+    const brands = await Product.distinct("brand", {
+      brand: { $ne: null, $ne: "" },
+      status: "active",
+    });
+
+    res.json(
+      brands
+        .filter(Boolean)
+        .map((b) => b.trim())
+        .sort((a, b) => a.localeCompare(b))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Cannot fetch brands" });
+  }
+};
+exports.getProductsByCategories = async (req, res) => {
+  try {
+    let { categories, page = 1, limit = 12 } = req.query;
+
+    if (!categories) {
+      return res.status(400).json({ message: "Thiếu categories" });
+    }
+
+    // categories[]=id hoặc categories=id
+    if (!Array.isArray(categories)) {
+      categories = [categories];
+    }
+
+    page = Number(page);
+    limit = Number(limit);
+    const skip = (page - 1) * limit;
+
+    const query = {
+      category: { $in: categories },
+      status: "active",
+    };
+
+    const total = await Product.countDocuments(query);
+
+    const products = await Product.find(query)
+      .populate("category", "name")
+      .populate("variants.color", "name code")
+      .populate("variants.size", "name code")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // === Chuẩn hóa giống FE đang dùng ===
+    const formatted = products.map((p) => {
+      const variants = p.variants || [];
+
+      // Lọc variant hợp lệ
+      const validVariants = variants.filter(
+        (v) =>
+          v &&
+          typeof v.price === "number" &&
+          v.price > 0 &&
+          v.color &&
+          v.size
+      );
+
+      const prices = validVariants.map((v) => v.price);
+
+      return {
+        _id: p._id,
+        name: p.name,
+
+        // ✅ coverImage ưu tiên
+        coverImage:
+          p.coverImage ||
+          validVariants[0]?.coverImage ||
+          validVariants[0]?.images?.[0] ||
+          "/imgs/placeholder.jpg",
+
+        // ✅ TRẢ FULL VARIANTS (QUAN TRỌNG NHẤT)
+        variants: validVariants,
+      };
+    });
+
+
+    res.json({
+      success: true,
+      data: formatted,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error("GET PRODUCTS BY CATEGORIES ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
