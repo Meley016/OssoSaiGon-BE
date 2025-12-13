@@ -108,6 +108,10 @@ const orderSchema = new mongoose.Schema(
     // Metadata VNPay (lưu lại để đối soát)
     vnpayTransactionNo: String,
     vnpayResponseCode: String,
+    vnpayTxnRef: {
+      type: String,
+      index: true,
+    },
   },
   {
     timestamps: true,
