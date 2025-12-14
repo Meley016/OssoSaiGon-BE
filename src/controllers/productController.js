@@ -724,13 +724,22 @@ exports.getAllBrands = async (req, res) => {
 };
 exports.getProductsByCategories = async (req, res) => {
   try {
-    let { categories, page = 1, limit = 12 } = req.query;
+    let {
+      categories,
+      page = 1,
+      limit = 12,
+      name,
+      color,
+      inStock,
+      minPrice,
+      maxPrice,
+      sort,
+    } = req.query;
 
     if (!categories) {
       return res.status(400).json({ message: "Thiếu categories" });
     }
 
-    // categories[]=id hoặc categories=id
     if (!Array.isArray(categories)) {
       categories = [categories];
     }
@@ -739,54 +748,86 @@ exports.getProductsByCategories = async (req, res) => {
     limit = Number(limit);
     const skip = (page - 1) * limit;
 
+    /* ================= BASE QUERY ================= */
     const query = {
       category: { $in: categories },
       status: "active",
     };
 
+    // 🔍 SEARCH NAME (TEXT INDEX)
+    if (name) {
+      query.$text = { $search: name };
+    }
+
+    /* ================= VARIANT FILTER ================= */
+    const variantMatch = {};
+
+    // 🎨 color (ObjectId)
+    if (color) {
+      variantMatch["variants.color"] = color;
+    }
+
+    // 📦 stock
+    if (inStock === "true") {
+      variantMatch["variants.stockQuantity"] = { $gt: 0 };
+    }
+
+    // 💰 price
+    if (minPrice || maxPrice) {
+      variantMatch["variants.price"] = {};
+      if (minPrice) variantMatch["variants.price"].$gte = Number(minPrice);
+      if (maxPrice) variantMatch["variants.price"].$lte = Number(maxPrice);
+    }
+
+    Object.assign(query, variantMatch);
+
+    /* ================= SORT ================= */
+    let sortOption = { createdAt: -1 };
+
+    if (sort === "name_asc") sortOption = { name: 1 };
+    if (sort === "name_desc") sortOption = { name: -1 };
+    if (sort === "price_asc") sortOption = { "variants.price": 1 };
+    if (sort === "price_desc") sortOption = { "variants.price": -1 };
+
+    /* ================= QUERY ================= */
     const total = await Product.countDocuments(query);
 
     const products = await Product.find(query)
       .populate("category", "name")
       .populate("variants.color", "name code")
       .populate("variants.size", "name code")
-      .sort({ createdAt: -1 })
+      .sort(sortOption)
       .skip(skip)
       .limit(limit)
       .lean();
 
-    // === Chuẩn hóa giống FE đang dùng ===
+    /* ================= FORMAT ================= */
     const formatted = products.map((p) => {
-      const variants = p.variants || [];
+      let variants = p.variants || [];
 
-      // Lọc variant hợp lệ
-      const validVariants = variants.filter(
-        (v) =>
-          v &&
-          typeof v.price === "number" &&
-          v.price > 0 &&
-          v.color &&
-          v.size
-      );
+      // LỌC VARIANT ĐÚNG THEO FILTER
+      variants = variants.filter((v) => {
+        if (!v || typeof v.price !== "number") return false;
+        if (color && String(v.color?._id) !== String(color)) return false;
+        if (inStock === "true" && v.stockQuantity <= 0) return false;
+        if (minPrice && v.price < Number(minPrice)) return false;
+        if (maxPrice && v.price > Number(maxPrice)) return false;
+        return true;
+      });
 
-      const prices = validVariants.map((v) => v.price);
+      if (variants.length === 0) return null;
 
       return {
         _id: p._id,
         name: p.name,
-
-        // ✅ coverImage ưu tiên
         coverImage:
           p.coverImage ||
-          validVariants[0]?.coverImage ||
-          validVariants[0]?.images?.[0] ||
+          variants[0]?.coverImage ||
+          variants[0]?.images?.[0] ||
           "/imgs/placeholder.jpg",
-
-        // ✅ TRẢ FULL VARIANTS (QUAN TRỌNG NHẤT)
-        variants: validVariants,
+        variants,
       };
-    });
-
+    }).filter(Boolean);
 
     res.json({
       success: true,
