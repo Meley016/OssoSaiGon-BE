@@ -10,7 +10,16 @@ router.get(
   "/by-categories",
   productController.getProductsByCategories
 );
+router.get("/by-brand", productController.getProductsByBrand);
 
+router.get(
+  "/categories-by-brand",
+  productController.getCategoriesByBrand
+);
+router.get(
+  "/colors-by-brand-category",
+  productController.getColorsByBrandCategory
+);
 router.get("/brands", productController.getAllBrands);
 router.get("/filter", productController.filterProducts);
 
