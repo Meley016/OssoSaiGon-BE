@@ -4,7 +4,7 @@ const XLSX = require("xlsx");
 const path = require("path");
 const cloudinary = require("cloudinary").v2;
 const { Readable } = require("stream");
-
+const mongoose = require("mongoose");
 const Product = require("../models/Product");
 const Category = require("../models/Category");
 const Color = require("../models/Color");
@@ -841,3 +841,234 @@ exports.getProductsByCategories = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+exports.getProductsByBrand = async (req, res) => {
+  try {
+    let {
+      brand,
+      page = 1,
+      limit = 12,
+      name,
+      color,
+      inStock,
+      category,
+      sort,
+    } = req.query;
+
+    page = Number(page);
+    limit = Number(limit);
+    const skip = (page - 1) * limit;
+
+    /* ================= MATCH PRODUCT ================= */
+    const matchProduct = {
+      status: "active",
+    };
+
+    if (brand) matchProduct.brand = brand;
+    if (category) matchProduct.category = new mongoose.Types.ObjectId(category);
+
+    if (name) {
+      matchProduct.$text = { $search: name };
+    }
+
+    /* ================= MATCH VARIANT ================= */
+    const matchVariant = {};
+
+    if (color) {
+      matchVariant["variants.color"] = new mongoose.Types.ObjectId(color);
+    }
+
+    if (inStock === "true") {
+      matchVariant["variants.stockQuantity"] = { $gt: 0 };
+    }
+
+    /* ================= SORT ================= */
+    let sortStage = { createdAt: -1 };
+
+    if (sort === "name_asc") sortStage = { name: 1 };
+    if (sort === "name_desc") sortStage = { name: -1 };
+
+    /* ================= AGGREGATION ================= */
+    const pipeline = [
+      { $match: matchProduct },
+
+      // tách variant
+      { $unwind: "$variants" },
+
+      // lọc variant
+      { $match: matchVariant },
+
+      // lookup color
+      {
+        $lookup: {
+          from: "colors",
+          localField: "variants.color",
+          foreignField: "_id",
+          as: "variants.color",
+        },
+      },
+      { $unwind: { path: "$variants.color", preserveNullAndEmptyArrays: true } },
+
+      // lookup size
+      {
+        $lookup: {
+          from: "sizes",
+          localField: "variants.size",
+          foreignField: "_id",
+          as: "variants.size",
+        },
+      },
+      { $unwind: { path: "$variants.size", preserveNullAndEmptyArrays: true } },
+
+      // group lại product
+      {
+        $group: {
+          _id: "$_id",
+          name: { $first: "$name" },
+          brand: { $first: "$brand" },
+          category: { $first: "$category" },
+          createdAt: { $first: "$createdAt" },
+
+          variants: {
+            $push: {
+              sku: "$variants.sku",
+              price: "$variants.price",
+              stockQuantity: "$variants.stockQuantity",
+              color: "$variants.color",
+              size: "$variants.size",
+              images: "$variants.images",
+              coverImage: "$variants.coverImage",
+            },
+          },
+
+          minPrice: { $min: "$variants.price" },
+        },
+      },
+      {
+        $addFields: {
+          coverImage: {
+            $ifNull: [
+              { $arrayElemAt: ["$variants.coverImage", 0] },
+              { $arrayElemAt: ["$variants.images", 0] },
+            ],
+          },
+        },
+      },
+
+      // sort theo name
+      { $sort: sortStage },
+
+      // sort theo price (SAU group)
+      ...(sort === "price_asc"
+        ? [{ $sort: { minPrice: 1 } }]
+        : []),
+      ...(sort === "price_desc"
+        ? [{ $sort: { minPrice: -1 } }]
+        : []),
+
+      // paginate + total
+      {
+        $facet: {
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+          ],
+          total: [{ $count: "count" }],
+        },
+      },
+    ];
+
+    const result = await Product.aggregate(pipeline);
+
+    const data = result[0]?.data || [];
+    const total = result[0]?.total[0]?.count || 0;
+
+    res.json({
+      success: true,
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error("GET PRODUCTS BY BRAND AGG ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getCategoriesByBrand = async (req, res) => {
+  try {
+    const { brand } = req.query;
+    if (!brand) {
+      return res.status(400).json({ message: "Thiếu brand" });
+    }
+
+    const categoryIds = await Product.distinct("category", {
+      brand: new RegExp(`^${brand}$`, "i"),
+      status: "active",
+      category: { $ne: null },
+    });
+
+    const categories = await Category.find({
+      _id: { $in: categoryIds },
+    })
+      .select("_id name")
+      .sort({ name: 1 });
+
+    res.json({
+      success: true,
+      data: categories,
+    });
+  } catch (err) {
+    console.error("GET CATEGORIES BY BRAND ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+exports.getColorsByBrandCategory = async (req, res) => {
+  try {
+    const { brand, category } = req.query;
+
+    if (!brand) {
+      return res.status(400).json({ message: "Thiếu brand" });
+    }
+
+    const matchProduct = {
+      status: "active",
+      brand: new RegExp(`^${brand}$`, "i"),
+    };
+
+    if (category) {
+      matchProduct.category = new mongoose.Types.ObjectId(category);
+    }
+
+    const colorIds = await Product.aggregate([
+      { $match: matchProduct },
+      { $unwind: "$variants" },
+      {
+        $match: {
+          "variants.color": { $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: "$variants.color",
+        },
+      },
+    ]);
+
+    const ids = colorIds.map(c => c._id);
+
+    const colors = await Color.find({
+      _id: { $in: ids },
+    }).select("_id name code");
+
+    res.json({
+      success: true,
+      data: colors,
+    });
+  } catch (err) {
+    console.error("GET COLORS BY BRAND CATEGORY ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
