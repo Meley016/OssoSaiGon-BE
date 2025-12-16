@@ -105,11 +105,30 @@ const splitFiles = (files) => {
   console.log("🧩 Parsed variantImages (colorId keys):", Object.keys(variantImages));
   return { variantImages };
 };
-
+function groupByColor(variants) {
+  return variants.reduce((acc, v) => {
+    const cid = v.color.toString();
+    if (!acc[cid]) acc[cid] = [];
+    acc[cid].push(v);
+    return acc;
+  }, {});
+}
 const fileToUrl = (file) => {
   const url = file?.path || null;
   console.log("File to URL:", file?.originalname, "->", url);
   return url;
+};
+const deleteCloudinaryImages = async (urls = []) => {
+  for (const url of urls) {
+    const publicId = extractPublicId(url);
+    if (publicId) {
+      try {
+        await cloudinary.uploader.destroy(publicId);
+      } catch (err) {
+        console.warn("❌ Delete ảnh lỗi:", publicId);
+      }
+    }
+  }
 };
 
 const extractPublicId = (url) => {
@@ -616,75 +635,169 @@ exports.importProducts = async (req, res) => {
   }
 };
 
-
-// === UPDATE PRODUCT ===
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
+
     const product = await Product.findById(id);
-    if (!product) return res.status(404).json({ error: "Không tìm thấy!" });
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
 
-    const body = req.body;
+    /* =====================
+       UPDATE BASIC INFO
+    ===================== */
+    const { SKU, name, brand, category, description } = req.body;
 
-    // Cập nhật chung
-    ['name', 'brand', 'category', 'description'].forEach(f => {
-      if (body[f]) product[f] = body[f];
-    });
-    if (body.SKU) product.groupId = body.SKU;
+    if (SKU) product.groupId = SKU.trim();
+    if (name) product.name = name.trim();
+    if (brand) product.brand = brand.trim();
+    if (category) product.category = category;
+    if (description !== undefined) product.description = description;
 
-    // Xử lý variant
-    const variantIds = Array.isArray(body.variantId) ? body.variantId : [body.variantId].filter(Boolean);
-    const skus = Array.isArray(body.sku) ? body.sku : [body.sku].filter(Boolean);
-    const colorIds = Array.isArray(body.colorId) ? body.colorId : [body.colorId].filter(Boolean);
-    const sizeIds = Array.isArray(body.sizeId) ? body.sizeId : [body.sizeId].filter(Boolean);
-    const prices = Array.isArray(body.price) ? body.price.map(Number) : [body.price].map(Number);
-    const stocks = Array.isArray(body.stock) ? body.stock.map(Number) : [body.stock].map(Number);
+    /* =====================
+       PARSE VARIANTS
+    ===================== */
+    let variants = [];
+    try {
+      variants = JSON.parse(req.body.variants || "[]");
+    } catch {
+      return res.status(400).json({ error: "Variants JSON invalid" });
+    }
 
-    const keptSKUs = new Set();
+    if (!variants.length) {
+      return res.status(400).json({ error: "At least one variant is required" });
+    }
 
-    for (let i = 0; i < skus.length; i++) {
-      const sku = skus[i];
-      const colorId = colorIds[i];
-      const sizeId = sizeIds[i];
-      const price = prices[i];
-      const stock = stocks[i];
+    /* =====================
+       MAP FILES BY COLOR
+    ===================== */
+    const filesByColor = {};
+    if (Array.isArray(req.files)) {
+      req.files.forEach(file => {
+        const match = file.fieldname.match(/^variantImageFile\[(.+)\]$/);
+        if (!match) return;
 
-      if (!sku || !colorId || !sizeId || isNaN(price) || isNaN(stock)) continue;
+        const colorId = match[1];
+        if (!filesByColor[colorId]) filesByColor[colorId] = [];
+        filesByColor[colorId].push(file);
+      });
+    }
 
-      keptSKUs.add(sku);
+    /* =====================
+       REMOVE IMAGES (DB + CLOUDINARY)
+    ===================== */
+    const removeImages =
+      req.body.removeImages ||
+      req.body["removeImages[]"] ||
+      [];
 
-      const existing = product.variants.find(v => v.sku === sku);
-      if (existing) {
+    const removeSet = new Set(
+      Array.isArray(removeImages) ? removeImages : [removeImages]
+    );
+
+    if (removeSet.size) {
+      for (const variant of product.variants) {
+        if (!Array.isArray(variant.images)) continue;
+
+        variant.images = variant.images.filter(imgUrl => {
+          if (removeSet.has(imgUrl)) {
+            // 🔥 extract public_id từ URL
+            const parts = imgUrl.split("/upload/");
+            if (parts[1]) {
+              const publicId = parts[1]
+                .replace(/^v\d+\//, "")
+                .replace(/\.[^/.]+$/, "");
+
+              cloudinary.uploader
+                .destroy(publicId)
+                .catch(err =>
+                  console.error("Cloudinary delete failed:", publicId, err.message)
+                );
+            }
+            return false; // ❌ remove khỏi DB
+          }
+          return true;
+        });
+
+        variant.coverImage = variant.images[0] || null;
+      }
+
+      product.markModified("variants");
+    }
+
+    /* =====================
+       PROCESS VARIANTS
+    ===================== */
+    const keepVariantIds = new Set();
+
+    for (const v of variants) {
+      const { _id, color, size, stockQuantity, price } = v;
+      if (!color || !size || price <= 0) continue;
+
+      if (_id) {
+        // UPDATE VARIANT CŨ
+        const existing = product.variants.id(_id);
+        if (!existing) continue;
+
+        existing.stockQuantity = stockQuantity;
         existing.price = price;
-        existing.stockQuantity = stock;
-        existing.importPrice = Math.round(price * 0.8);
+        keepVariantIds.add(existing._id.toString());
       } else {
+        // ADD VARIANT MỚI
         product.variants.push({
-          sku, color: colorId, size: sizeId,
-          price, stockQuantity: stock, importPrice: Math.round(price * 0.8),
-          images: [], coverImage: null
+          sku: `${product.groupId}-${color}-${size}`,
+          color,
+          size,
+          stockQuantity,
+          price,
+          importPrice: Math.round(price * 0.8),
+          images: [],
+          coverImage: null
+        });
+
+        const last = product.variants[product.variants.length - 1];
+        keepVariantIds.add(last._id.toString());
+      }
+    }
+
+    product.variants = product.variants.filter(v =>
+      keepVariantIds.has(v._id.toString())
+    );
+
+    /* =====================
+       UPLOAD NEW IMAGES
+    ===================== */
+    for (const colorId in filesByColor) {
+      for (const file of filesByColor[colorId]) {
+        const upload = await cloudinary.uploader.upload(file.path, {
+          folder: `oso/products/${product.groupId}`
+        });
+
+        product.variants.forEach(v => {
+          if (v.color.toString() === colorId) {
+            v.images.push(upload.secure_url);
+            v.coverImage = v.images[0] || null;
+          }
         });
       }
     }
 
-    // Xóa variant không còn
-    product.variants = product.variants.filter(v => keptSKUs.has(v.sku));
+    /* =====================
+       UPDATE PRODUCT COVER
+    ===================== */
+    const firstVariantWithImage = product.variants.find(v => v.coverImage);
+    product.coverImage = firstVariantWithImage?.coverImage || null;
 
     await product.save();
+    res.json({ success: true, product });
 
-    const populated = await Product.findById(product._id)
-      .populate("category", "name")
-      .populate("variants.color", "name code")
-      .populate("variants.size", "name code")
-      .lean();
-
-    res.json(populated);
   } catch (err) {
-    console.error("UPDATE ERROR:", err);
-    res.status(500).json({ error: "Lỗi cập nhật", details: err.message });
+    console.error("updateProduct error:", err);
+    res.status(500).json({ error: "Update product failed" });
   }
 };
-// === DELETE PRODUCT ===
+
 exports.deleteProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);

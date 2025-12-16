@@ -22,15 +22,14 @@ exports.renderSection = async (req, res) => {
   const section = req.params.section;
   const validSections = Object.values(PERMISSIONS).flat();
 
-  //  Kiểm tra section hợp lệ
+  // Kiểm tra section hợp lệ
   if (!validSections.includes(section)) {
     return res.status(404).render("admin/404", { title: "404 - Không tìm thấy" });
   }
 
-  //  LẤY ROLE TỪ req.user HOẶC req.session.admin
   const role = req.user?.role || req.session?.admin?.role;
 
-  //  KIỂM TRA QUYỀN
+  // Kiểm tra quyền
   if (!role || !PERMISSIONS[role]?.includes(section)) {
     return res.status(403).render("admin/403", {
       title: "403 - Không có quyền",
@@ -41,7 +40,7 @@ exports.renderSection = async (req, res) => {
   try {
     const data = {
       activeMenu: section,
-      admin: req.session.admin || { role }, // fallback nếu không có session
+      admin: req.session.admin || { role },
       categories: [],
       sizes: [],
       colors: [],
@@ -55,58 +54,79 @@ exports.renderSection = async (req, res) => {
       footer: [],
     };
 
-    // LOAD DỮ LIỆU THEO SECTION
     switch (section) {
-      case "product":
-        data.products = await Product.find().sort({ createdAt: -1 });
-        data.categories = await Category.find().sort({ createdAt: -1 });
-        data.sizes = await Size.find().sort({ createdAt: -1 });
-        data.colors = await Color.find().sort({ createdAt: -1 });
+      case "product": {
+        const [products, categories, sizes, colors] = await Promise.all([
+          Product.find().sort({ createdAt: -1 }).lean(),
+          Category.find().sort({ createdAt: -1 }).lean(),
+          Size.find().sort({ createdAt: -1 }).lean(),
+          Color.find().sort({ createdAt: -1 }).lean(),
+        ]);
+        data.products = products;
+        data.categories = categories;
+        data.sizes = sizes;
+        data.colors = colors;
         break;
+      }
 
       case "category":
-        data.categories = await Category.find().sort({ createdAt: -1 });
+        data.categories = await Category.find().sort({ createdAt: -1 }).lean();
         break;
 
       case "size":
-        data.sizes = await Size.find().sort({ createdAt: -1 });
+        data.sizes = await Size.find().sort({ createdAt: -1 }).lean();
         break;
 
       case "color":
-        data.colors = await Color.find().sort({ createdAt: -1 });
+        data.colors = await Color.find().sort({ createdAt: -1 }).lean();
         break;
 
-      case "order":
-        data.orders = await Order.find().sort({ createdAt: -1 });
-        data.users = await User.find({ role: "user" }).sort({ createdAt: -1 });
-        data.products = await Product.find().sort({ createdAt: -1 });
-        data.promotions = await Promotion.find({ isActive: true }).sort({ createdAt: -1 });
+      case "order": {
+        const [orders, users, products, promotions] = await Promise.all([
+          Order.find().sort({ createdAt: -1 }).lean(),
+          User.find({ role: "user" }).sort({ createdAt: -1 }).lean(),
+          Product.find().sort({ createdAt: -1 }).lean(),
+          Promotion.find({ isActive: true }).sort({ createdAt: -1 }).lean(),
+        ]);
+        data.orders = orders;
+        data.users = users;
+        data.products = products;
+        data.promotions = promotions;
         break;
+      }
 
       case "user":
-        data.users = await User.find().sort({ createdAt: -1 });
+        data.users = await User.find().sort({ createdAt: -1 }).lean();
         break;
 
-      case "promotion":
-        data.promotions = await Promotion.find().sort({ createdAt: -1 });
-        data.users = await User.find({ role: "user" }).sort({ createdAt: -1 });
-        data.products = await Product.find().sort({ createdAt: -1 });
-        data.categories = await Category.find().sort({ createdAt: -1 });
+      case "promotion": {
+        const [promotions, users, products, categories] = await Promise.all([
+          Promotion.find().sort({ createdAt: -1 }).lean(),
+          User.find({ role: "user" }).sort({ createdAt: -1 }).lean(),
+          Product.find().sort({ createdAt: -1 }).lean(),
+          Category.find().sort({ createdAt: -1 }).lean(),
+        ]);
+        data.promotions = promotions;
+        data.users = users;
+        data.products = products;
+        data.categories = categories;
         break;
+      }
 
       case "shipping":
-        data.shippings = await Shipping.find().sort({ createdAt: -1 });
+        data.shippings = await Shipping.find().sort({ createdAt: -1 }).lean();
         break;
 
       case "blog":
-        data.blogs = await Blog.find().sort({ createdAt: -1 });
+        data.blogs = await Blog.find().sort({ createdAt: -1 }).lean();
         break;
 
       case "banner":
-        data.banners = await Banner.find().sort({ order: 1 });
+        data.banners = await Banner.find().sort({ order: 1 }).lean();
         break;
+
       case "footer":
-        data.footer = await Footer.find().sort({ createdAt: -1});
+        data.footer = await Footer.find().sort({ createdAt: -1 }).lean();
         break;
     }
 
