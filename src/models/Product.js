@@ -11,7 +11,7 @@ const variantSchema = new mongoose.Schema(
     images: [{ type: String }],
     coverImage: { type: String }
   },
-  { _id: false }
+  // { _id: false }
 );
 
 const productSchema = new mongoose.Schema(

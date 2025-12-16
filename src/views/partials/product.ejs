@@ -1,7 +1,40 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
 <link rel="stylesheet" href="/css/globe.css">
+<style>
+  .global-loading {
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,0.75);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
 
+.loading-box {
+  text-align: center;
+  background: #fff;
+  padding: 24px 32px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.15);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #eee;
+  border-top: 4px solid #1677ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 12px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+</style>
 <div class="product-container">
 
   <!-- TẠO SẢN PHẨM -->
@@ -101,14 +134,13 @@
         <button type="button" id="edit-addVariant" class="btn-custom">Thêm</button>
         <table class="variant-table">
           <thead>
-            <tr>
-              <th>Màu</th>
-              <th>Size</th>
-              <th>SL</th>
-              <th>Giá</th>
-              <th>Ảnh</th>
-              <th></th>
-            </tr>
+          <tr>
+            <th>Màu</th>
+            <th>Size</th>
+            <th>Tồn kho</th>
+            <th>Giá</th>
+            <th>Ảnh</th>
+          </tr>
           </thead>
           <tbody id="editVariantBody"></tbody>
         </table>
@@ -157,11 +189,27 @@
 </div>
 <div id="toastContainer" class="toast-container"></div>
 
+<div id="globalLoading" class="global-loading">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <p id="loadingText">Đang xử lý...</p>
+  </div>
+</div>
 <script>
 let colorsRes = [], sizesRes = [], categoriesRes = [];
 let currentFilters = {};
 let currentPage = 1;
 const limit = 21;
+
+function showLoading(text = "Đang xử lý...") {
+  const el = document.getElementById("globalLoading");
+  document.getElementById("loadingText").textContent = text;
+  el.style.display = "flex";
+}
+
+function hideLoading() {
+  document.getElementById("globalLoading").style.display = "none";
+}
 
 // === THÊM BIẾN THỂ ===
 function addVariantRow(body, variant = {}, isEdit = false) {
@@ -245,7 +293,17 @@ function addVariantRow(body, variant = {}, isEdit = false) {
       ${idx === 0 ? '<div style="position:absolute;top:2px;left:2px;background:#ff6b6b;color:white;font-size:8px;padding:1px 4px;border-radius:2px;">BÌA</div>' : ''}
       <input type="hidden" name="keepImages[]" value="${src}">
     `;
-    div.querySelector(".remove-img").onclick = () => div.remove();
+    div.querySelector(".remove-img").onclick = () => {
+      const input = div.querySelector("input[name='keepImages[]']");
+      if (input) {
+        const hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = "removeImages[]";
+        hidden.value = input.value;
+        div.parentElement.appendChild(hidden);
+      }
+      div.remove();
+    };
     preview.appendChild(div);
   });
 
@@ -283,58 +341,86 @@ function addVariantRow(body, variant = {}, isEdit = false) {
   row.querySelector(".btn-remove").onclick = () => row.remove();
 }
 
-function addVariantRowEdit(body, variant = {}, isExisting = true) {
+// function addVariantRowEdit(body, variant) {
+//   const row = document.createElement("tr");
 
-  const row = document.createElement("tr");
+//   row.innerHTML = `
+//     <!-- ID để backend biết là variant cũ -->
+//     <input type="hidden" name="variantId[]" value="${variant._id}">
+//     <input type="hidden" name="colorId[]" value="${variant.color._id}">
+//     <input type="hidden" name="sizeId[]" value="${variant.size._id}">
 
-  const baseSKU = document.getElementById('edit-SKU').value || '';
-  const colorId = variant.color?._id || variant.color || '';
-  const sizeId = variant.size?._id || variant.size || '';
-  const computedSKU = `${baseSKU}-${colorId}-${sizeId}`.toUpperCase();
+//     <td>${variant.color.name}</td>
+//     <td>${variant.size.name}</td>
 
-  const imagePreview = isExisting && variant.images?.length
-    ? `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
-         ${variant.images.map(img => `<img src="${img}" style="width:30px;height:30px;object-fit:cover;border-radius:3px;">`).join('')}
-       </div>`
-    : '<small style="color:#999;">Chưa có ảnh</small>';
+//     <td>
+//       <input
+//         type="number"
+//         name="stock[]"
+//         value="${variant.stockQuantity}"
+//         min="0"
+//         class="ant-input"
+//         required
+//       >
+//     </td>
 
-  row.innerHTML = `
-    ${isExisting ? `<input type="hidden" name="variantId[]" value="${variant._id}">` : ''}
-    <input type="hidden" name="variantSKU[]" value="${computedSKU}">
-    ${isExisting ? `<input type="hidden" name="colorId[]" value="${colorId}">` : ''}
-    ${isExisting ? `<input type="hidden" name="sizeId[]" value="${sizeId}">` : ''}
+//     <td>
+//       <input
+//         type="number"
+//         name="price[]"
+//         value="${variant.price}"
+//         min="1"
+//         class="ant-input"
+//         required
+//       >
+//     </td>
 
-    <td data-label="Màu">
-      <span style="font-weight:500; color:#d4380d;">${variant.color?.name || 'N/A'}</span>
-    </td>
+//     <td>
+//       <div class="image-preview" style="display:flex;gap:4px;flex-wrap:wrap;">
+//         ${(variant.images || []).map(img =>
+//           `<img src="${img}" style="width:32px;height:32px;border-radius:4px;">`
+//         ).join("")}
+//       </div>
 
-    <td data-label="Size">
-      <span style="font-weight:500; color:#d4380d;">${variant.size?.name || 'N/A'}</span>
-    </td>
+//       <!-- QUAN TRỌNG: upload ảnh theo COLOR -->
+//       <input
+//         type="file"
+//         class="variant-file-input"
+//         data-color="${variant.color._id}"
+//         multiple
+//         accept="image/*"
+//       >
+//     </td>
 
-    <td data-label="SL">
-      <input type="number" name="stock[]" value="${variant.stockQuantity || 0}" min="0" class="ant-input" required style="width:80px;">
-    </td>
+//     <td>
+//       <button type="button" class="btn-remove">Xóa</button>
+//     </td>
+//   `;
 
-    <td data-label="Giá">
-      <input type="number" name="price[]" value="${variant.price || 0}" min="1000" step="1000" class="ant-input" required style="width:100px;">
-    </td>
+//   row.querySelector(".btn-remove").onclick = () => {
+//     if (!confirm("Xóa biến thể này?")) return;
+//     row.remove();
+//   };
 
-    <td data-label="Ảnh">
-      ${imagePreview}
-    </td>
+//   body.appendChild(row);
+// }
 
-    <td data-label="">
-      <button type="button" class="btn-remove" style="background:#ff4d4f;color:white;padding:4px 8px;font-size:11px;border:none;border-radius:3px;">Xóa</button>
-    </td>
-  `;
+function groupVariantsByColor(variants) {
+  const map = {};
 
-  body.appendChild(row);
+  variants.forEach(v => {
+    const colorId = v.color._id;
+    if (!map[colorId]) {
+      map[colorId] = {
+        color: v.color,
+        images: v.images || [],
+        variants: []
+      };
+    }
+    map[colorId].variants.push(v);
+  });
 
-  row.querySelector(".btn-remove").onclick = () => {
-    if (isExisting && !confirm("Xóa biến thể này? Dữ liệu sẽ mất vĩnh viễn!")) return;
-    row.remove();
-  };
+  return Object.values(map);
 }
 
 // === DOMContentLoaded ===
@@ -392,7 +478,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!variants.length) return showToast("Cần ít nhất 1 biến thể hợp lệ!", "error");
 
     formData.append("variants", JSON.stringify(variants));
-
+    
+    showLoading("Đang tạo sản phẩm...");
+    
     try {
       const res = await fetch("/api/products", { method: "POST", body: formData });
       const data = await res.json();
@@ -401,9 +489,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.target.reset();
       document.getElementById("variantBody").innerHTML = "";
       loadProducts();
-    } catch (err) {
-      showToast("Lỗi: " + err.message, "error");
-    }
+      } catch (err) {
+        showToast("Lỗi: " + err.message, "error");
+      } finally {
+      hideLoading();
+    };
   };
 
 
@@ -418,6 +508,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     btn.textContent = "Đang nhập...";
     console.log("Import FormData:", Array.from(formData.entries()).map(([k, v]) => [k, v instanceof File ? v.name : v]));
 
+    showLoading("Đang import dữ liệu...");
+
     try {
       const res = await fetch("/api/products/import", { method: "POST", body: formData });
       const data = await res.json();
@@ -430,6 +522,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     finally {
     // 🟢 Kết thúc loading
+    hideLoading();
     btn.disabled = false;
     btn.textContent = originalText;
   }
@@ -457,49 +550,109 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // === LOAD PRODUCTS ===
   window.loadProducts = async (filters = {}, page = 1) => {
-    currentPage = page;
-    const params = new URLSearchParams({ ...filters, page, limit });
-    try {
-      const res = await fetch(`/api/products?${params}`);
-      if (!res.ok) throw new Error("Lỗi tải sản phẩm");
-      const data = await res.json();
+  currentPage = page;
 
-      const grid = document.getElementById("productGrid");
-      grid.innerHTML = (data.data || []).map(p => {
-        const variants = Array.isArray(p.variants) ? p.variants : [];
-        const safeVariants = variants.filter(v => v && v.color && v.color._id && typeof v.price === "number");
-        const prices = safeVariants.map(v => v.price);
-        const minPrice = prices.length ? Math.min(...prices) : 0;
-        const uniqueColors = [...new Map(safeVariants.filter(v => v.color && v.color._id).map(v => [v.color._id, v.color])).values()];
-        const colorCount = uniqueColors.length;
-        const gridCols = Math.min(colorCount, 4);
-        const extra = colorCount > 4 ? colorCount - 4 : 0;
+  const params = new URLSearchParams({ ...filters, page, limit });
+  const grid = document.getElementById("productGrid");
 
-        return `
-          <div class="product-card" onclick="showProductDetail('${p._id}')">
-            <img src="${p.coverImage || '/imgs/placeholder.jpg'}" onerror="this.src='/imgs/placeholder.jpg'" />
-            <h4>${p.name}</h4>
-            <p class="sku">SKU: ${p.groupId}</p>
-            <p class="price-display">${minPrice.toLocaleString()} VNĐ</p>
-            <div class="color-dots">
-              ${uniqueColors.slice(0, 4).map(c => `<div title="${c.name}" class="dot" style="background:${c.code || '#ddd'}"></div>`).join("")}
-              ${extra > 0 ? `<div class="dot more">+${extra}</div>` : ""}
-            </div>
-            <div class="product-card-actions">
-              <button onclick="event.stopPropagation(); editProduct('${p._id}')" class="btn-edit">Sửa</button>
-              <button onclick="event.stopPropagation(); deleteProduct('${p._id}')" class="btn-delete">Xóa</button>
-            </div>
-          </div>
-        `;
-      }).join("") || '<p style="text-align:center;padding:20px;">Chưa có sản phẩm nào.</p>';
+  /* =====================
+     SHOW SKELETON
+  ===================== */
+  grid.innerHTML = Array.from({ length: limit }).map(() => `
+    <div class="product-card skeleton">
+      <div class="img"></div>
+      <div class="line"></div>
+      <div class="line short"></div>
+    </div>
+  `).join("");
 
-      const pagination = document.getElementById("pagination");
-      const totalPages = data.pagination?.totalPages || 1;
-      renderPagination(page, totalPages);
-    } catch (err) {
-      document.getElementById("productGrid").innerHTML = '<p style="text-align:center;padding:20px;">Lỗi tải sản phẩm!</p>';
+  try {
+    const res = await fetch(`/api/products?${params}`);
+    if (!res.ok) throw new Error("Lỗi tải sản phẩm");
+
+    const data = await res.json();
+    const products = Array.isArray(data.data) ? data.data : [];
+
+    grid.innerHTML = "";
+
+    if (!products.length) {
+      grid.innerHTML = '<p style="text-align:center;padding:20px;">Chưa có sản phẩm nào.</p>';
+      return;
     }
-  };
+
+    /* =====================
+       RENDER TỪNG PRODUCT
+    ===================== */
+    for (const p of products) {
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      const safeVariants = variants.filter(
+        v => v && v.color && v.color._id && typeof v.price === "number"
+      );
+
+      const prices = safeVariants.map(v => v.price);
+      const minPrice = prices.length ? Math.min(...prices) : 0;
+
+      const uniqueColors = [
+        ...new Map(
+          safeVariants
+            .filter(v => v.color && v.color._id)
+            .map(v => [v.color._id, v.color])
+        ).values()
+      ];
+
+      const colorCount = uniqueColors.length;
+      const extra = colorCount > 4 ? colorCount - 4 : 0;
+
+      const card = document.createElement("div");
+      card.className = "product-card";
+      card.onclick = () => showProductDetail(p._id);
+
+      card.innerHTML = `
+        <img
+          loading="lazy"
+          src="${p.coverImage || '/imgs/placeholder.jpg'}"
+          onerror="this.src='/imgs/placeholder.jpg'"
+        />
+        <h4>${p.name}</h4>
+        <p class="sku">SKU: ${p.groupId}</p>
+        <p class="price-display">${minPrice.toLocaleString()} VNĐ</p>
+        <div class="color-dots">
+          ${uniqueColors.slice(0, 4).map(c =>
+            `<div title="${c.name}" class="dot" style="background:${c.code || '#ddd'}"></div>`
+          ).join("")}
+          ${extra > 0 ? `<div class="dot more">+${extra}</div>` : ""}
+        </div>
+        <div class="product-card-actions">
+          <button class="btn-edit">Sửa</button>
+          <button class="btn-delete">Xóa</button>
+        </div>
+      `;
+
+      card.querySelector(".btn-edit").onclick = e => {
+        e.stopPropagation();
+        editProduct(p._id);
+      };
+
+      card.querySelector(".btn-delete").onclick = e => {
+        e.stopPropagation();
+        deleteProduct(p._id);
+      };
+
+      grid.appendChild(card);
+    }
+
+    /* =====================
+       PAGINATION
+    ===================== */
+    const totalPages = data.pagination?.totalPages || 1;
+    renderPagination(page, totalPages);
+
+  } catch (err) {
+    console.error(err);
+    grid.innerHTML = '<p style="text-align:center;padding:20px;">Lỗi tải sản phẩm!</p>';
+  }
+};
+
 
   // === CHI TIẾT SẢN PHẨM ===
   window.showProductDetail = async (id) => {
@@ -539,6 +692,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   window.closeDetailModal = () => document.getElementById("detailModal").style.display = "none";
+  
+  document.addEventListener("click", e => {
+    if (!e.target.classList.contains("remove-img")) return;
+
+    const imgItem = e.target.closest(".image-item");
+    const keepInput = imgItem.querySelector("input[name='keepImages[]']");
+    
+    if (keepInput) {
+      const remove = document.createElement("input");
+      remove.type = "hidden";
+      remove.name = "removeImages[]";
+      remove.value = keepInput.value;
+
+      imgItem.parentElement.appendChild(remove);
+    }
+
+    imgItem.remove();
+  });
 
   // === SỬA SẢN PHẨM ===
   window.editProduct = async id => {
@@ -556,13 +727,117 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const body = document.getElementById("editVariantBody");
       body.innerHTML = "";
-      
-      p.variants.forEach(v => addVariantRowEdit(body, v, true));
+
+      const grouped = groupVariantsByColor(p.variants);
+
+      grouped.forEach(group => {
+        const rowSpan = group.variants.length;
+
+        group.variants.forEach((v, index) => {
+          const tr = document.createElement("tr");
+
+          tr.innerHTML = `
+            <input type="hidden" name="variantId[]" value="${v._id}">
+            <input type="hidden" name="colorId[]" value="${group.color._id}">
+            <input type="hidden" name="sizeId[]" value="${v.size._id}">
+
+            ${
+              index === 0
+                ? `
+                <td rowspan="${rowSpan}">
+                  <strong>${group.color.name}</strong>
+                </td>
+                `
+                : ""
+            }
+
+            <td>${v.size.name}</td>
+
+            <td>
+              <input
+                type="number"
+                name="stock[]"
+                value="${v.stockQuantity}"
+                min="0"
+                class="ant-input"
+                required
+              >
+            </td>
+
+            <td>
+              <input
+                type="number"
+                name="price[]"
+                value="${v.price}"
+                min="1"
+                class="ant-input"
+                required
+              >
+            </td>
+
+            ${
+              index === 0
+                ? `
+                <td rowspan="${rowSpan}">
+                  <div class="image-preview" style="display:flex;gap:6px;flex-wrap:wrap;">
+                    ${(group.images || []).map(img => `
+                      <div class="image-item" style="position:relative;">
+                        <img src="${img}" style="width:40px;height:40px;border-radius:4px;">
+                        
+                        <!-- ❌ nút xóa -->
+                        <button
+                          type="button"
+                          class="remove-img"
+                          style="
+                            position:absolute;
+                            top:-6px;
+                            right:-6px;
+                            background:red;
+                            color:white;
+                            border:none;
+                            width:16px;
+                            height:16px;
+                            font-size:10px;
+                            border-radius:50%;
+                            cursor:pointer;
+                          "
+                        >x</button>
+
+                        <!-- mặc định giữ ảnh -->
+                        <input type="hidden" name="keepImages[]" value="${img}">
+                      </div>
+                    `).join("")}
+                  </div>
+
+
+                  <input
+                    type="file"
+                    class="variant-file-input"
+                    data-color="${group.color._id}"
+                    multiple
+                    accept="image/*"
+                  >
+                  <small>Ảnh áp dụng cho toàn bộ size màu này</small>
+                </td>
+                `
+                : ""
+            }
+          `;
+
+          body.appendChild(tr);
+        });
+        // group.variants.forEach(v => addVariantRowEdit(body, v, true));
+      });
+
 
       // Nút thêm biến thể mới
-      const btnAdd = document.getElementById("edit-addVariant");
-      btnAdd.onclick = () => addVariantRow(document.getElementById("editVariantBody"), {}, false);
-
+      document.getElementById("edit-addVariant").onclick = () => {
+        addVariantRow(
+          document.getElementById("editVariantBody"),
+          {},
+          false // variant mới
+        );
+      };
       document.getElementById('editModal').style.display = 'block';
     } catch (err) {
       showToast("Lỗi: " + err.message, "error");
@@ -570,86 +845,112 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   // === CẬP NHẬT ===
-  document.getElementById("edit-form").onsubmit = async e => {
-    e.preventDefault();
-    const formData = new FormData();
-    const id = document.getElementById("edit-id").value;
+ document.getElementById("edit-form").onsubmit = async e => {
+  e.preventDefault();
 
-    // Thông tin chung
-    ['SKU', 'name', 'brand', 'category', 'description'].forEach(f => {
-      const val = document.getElementById(`edit-${f}`).value.trim();
-      if (val) formData.append(f, val);
+  const id = document.getElementById("edit-id").value;
+  const formData = new FormData();
+
+  // ===== INFO CHUNG =====
+  ["SKU", "name", "brand", "category", "description"].forEach(f => {
+    const el = document.getElementById(`edit-${f}`);
+    if (el?.value) formData.append(f, el.value.trim());
+  });
+
+  // ===== VARIANTS =====
+  const rows = document.querySelectorAll("#editVariantBody tr");
+  const variants = [];
+  const uploadedColors = new Set();
+
+  rows.forEach(row => {
+    const variantId =
+      row.querySelector("input[name='variantId[]']")?.value || null;
+
+    const colorId =
+      row.querySelector("input[name='colorId[]']")?.value ||
+      row.querySelector("select[name='variantColor[]']")?.value;
+
+    const sizeId =
+      row.querySelector("input[name='sizeId[]']")?.value ||
+      row.querySelector("select[name='variantSize[]']")?.value;
+
+    const stock = Number(
+      row.querySelector("input[name='stock[]'], input[name='variantStock[]']")
+        ?.value || 0
+    );
+
+    const price = Number(
+      row.querySelector("input[name='price[]'], input[name='variantPrice[]']")
+        ?.value || 0
+    );
+
+    if (!colorId || !sizeId || price <= 0) return;
+
+    variants.push({
+      _id: variantId,
+      color: colorId,
+      size: sizeId,
+      stockQuantity: stock,
+      price
     });
 
-    // === XỬ LÝ BIẾN THỂ ===
-    const rows = document.querySelectorAll("#editVariantBody tr");
-    let hasValid = false;
-
-    const uploadedColors = new Set();
-
-    for (const row of rows) {
-      const variantId = row.querySelector("input[name='variantId[]']")?.value || "";
-      const sku = row.querySelector("input[name='variantSKU[]']")?.value || "";
-      const colorSelect = row.querySelector("select[name='variantColor[]']");
-      const sizeSelect = row.querySelector("select[name='variantSize[]']");
-      const isNew = colorSelect && sizeSelect; // mới = có select
-
-      let colorId, sizeId;
-
-      if (isNew) {
-        colorId = colorSelect.value;
-        sizeId = sizeSelect.value;
-      } else {
-        colorId = row.querySelector("input[name='colorId[]']")?.value;
-        sizeId = row.querySelector("input[name='sizeId[]']")?.value;
+    // 🔥 upload ảnh MỖI COLOR 1 LẦN
+    if (!uploadedColors.has(colorId)) {
+      const fileInput = row.querySelector(
+        `.variant-file-input[data-color="${colorId}"]`
+      );
+      if (fileInput?.files?.length) {
+        [...fileInput.files].forEach(f =>
+          formData.append(`variantImageFile[${colorId}]`, f)
+        );
       }
-
-      const stock = parseInt(row.querySelector("input[name='stock[]']")?.value || 0);
-      const price = parseInt(row.querySelector("input[name='price[]']")?.value || 0);
-
-      if (!sku || !colorId || !sizeId || price < 1000 || stock < 0) continue;
-
-      formData.append("variantId[]", variantId);
-      formData.append("sku[]", sku);
-      formData.append("colorId[]", colorId);
-      formData.append("sizeId[]", sizeId);
-      formData.append("price[]", price);
-      formData.append("stock[]", stock);
-      hasValid = true;
-
-      // === UPLOAD ẢNH MỚI (chỉ cho variant mới) ===
-      if (isNew && !uploadedColors.has(colorId)) {
-        const fileInput = row.querySelector("input[type='file']");
-        if (fileInput && fileInput.files.length > 0) {
-          Array.from(fileInput.files).forEach(f => {
-            formData.append(`variantImageFile[${colorId}]`, f);
-          });
-          uploadedColors.add(colorId);
-        }
-      }
+      uploadedColors.add(colorId);
     }
+  });
 
-    if (!hasValid) return showToast("Cần ít nhất 1 biến thể!", "error");
+  if (!variants.length) {
+    return showToast("Cần ít nhất 1 biến thể hợp lệ!", "error");
+  }
 
-    try {
-      const res = await fetch(`/api/products/${id}`, {
-        method: "PUT",
-        body: formData
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Lỗi cập nhật");
-      showToast("Cập nhật thành công!");
-      closeEditModal();
-      loadProducts();
-    } catch (err) {
-      showToast("Lỗi: " + err.message, "error");
-    }
-  };
-    
+  formData.append("variants", JSON.stringify(variants));
+
+  // ===== GIỮ ẢNH CŨ (THEO COLOR) =====
+  document.querySelectorAll("input[name='keepImages[]']").forEach(i => {
+    formData.append("keepImages[]", i.value);
+  });
+
+  // ===== XÓA ẢNH CŨ (CHỈ KHI BẤM X) =====
+  document.querySelectorAll("input[name='removeImages[]']").forEach(i => {
+    formData.append("removeImages[]", i.value);
+  });
+
+  showLoading("Đang cập nhật...");
+  try {
+    const res = await fetch(`/api/products/${id}`, {
+      method: "PUT",
+      body: formData
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Lỗi cập nhật");
+
+    showToast("Cập nhật thành công!");
+    closeEditModal();
+    loadProducts();
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    hideLoading();
+  }
+};
+
   window.closeEditModal = () => document.getElementById('editModal').style.display = 'none';
 
   window.deleteProduct = async id => {
     if (!confirm("Xóa sản phẩm này?")) return;
+
+    showLoading("Đang xóa...");
+
     try {
       const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Lỗi xóa sản phẩm");
@@ -657,6 +958,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       loadProducts(currentFilters, currentPage);
     } catch (err) {
       showToast("Lỗi: " + err.message);
+    }finally {
+      hideLoading();
     }
   };
 
