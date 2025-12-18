@@ -32,6 +32,7 @@ const bannerRoutes = require("./routes/banner");
 const mainCategoryRoutes = require("./routes/mainCategories");
 const paymentRoutes = require("./routes/payment");
 const footerRoutes = require("./routes/footer");
+const preorderRoutes = require("./routes/preorder")
 
 // === CONTROLLER ===
 const dashboardController = require("./controllers/dashboardController");
@@ -218,7 +219,7 @@ app.use("/api/main-categories", mainCategoryRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/stripe", paymentRoutes);
 app.use("/api/footer", footerRoutes);
-
+app.use("/api/preorder", preorderRoutes);
 /* =============================
    ✅ ADMIN ROUTES
 ============================= */
