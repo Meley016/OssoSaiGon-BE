@@ -13,7 +13,8 @@ const Banner = require("../models/Banner");
 const Footer = require("../models/FooterInfo")
 // CẤU HÌNH QUYỀN TRUY CẬP THEO ROLE
 const PERMISSIONS = {
-  admin: ["product", "category", "size", "color", "order", "user", "promotion", "shipping", "blog", "banner","footer"],
+  admin: ["product", "category", "size", "color", "order", "user", "promotion", "shipping", "blog", "banner","footer",
+    "report"],
   writer: ["blog", "banner"],
   productAdder: ["product", "category", "size", "color", "promotion"]
 };
@@ -55,6 +56,9 @@ exports.renderSection = async (req, res) => {
     };
 
     switch (section) {
+      case "report":
+      // không cần preload data – fetch bằng JS
+      break;
       case "product": {
         const [products, categories, sizes, colors] = await Promise.all([
           Product.find().sort({ createdAt: -1 }).lean(),
