@@ -31,6 +31,13 @@
       %>
 
       <!-- MENU THEO QUYỀN -->
+       <% if (can(['admin'])) { %>
+          <a href="/admin/dashboard/report"
+            class="<%= activeMenu === 'report' ? 'active' : '' %>">
+            Báo cáo & Thống kê
+          </a>
+        <% } %>
+
       <% if (can(['admin', 'productAdder'])) { %>
         <a href="/admin/dashboard/product" class="<%= activeMenu === 'product' ? 'active' : '' %>">Sản phẩm</a>
       <% } %>

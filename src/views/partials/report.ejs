@@ -1,0 +1,221 @@
+
+
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/antd/4.24.14/antd.min.css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="/css/globe.css" />
+
+<style>
+/* =========================
+   REPORT PAGE – SCOPED CSS
+   (Giống footer)
+========================= */
+
+.admin-report-page {
+}
+
+/* Title */
+.admin-report-page .report-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+/* KPI */
+.admin-report-page .kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.admin-report-page .kpi-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.admin-report-page .kpi-label {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.admin-report-page .kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #000;
+}
+
+/* Chart */
+.admin-report-page .chart-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  margin-bottom: 32px;
+}
+
+.admin-report-page .chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.admin-report-page select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  font-weight: 600;
+}
+
+/* Table */
+.admin-report-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-report-page th {
+  background: #FFE6E6;
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.admin-report-page td {
+  padding: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .admin-report-page .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>
+<div class="container">
+<div class="admin-report-page">
+
+<div class="form-section">
+  <h2 class="report-title">Báo cáo & Thống kê</h2>
+    <!-- KPI -->
+  <div class="form-section">
+    <h2>Báo cáo người dùng</h2>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Tổng user</div>
+        <div class="kpi-value" id="totalUsers">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Hôm nay</div>
+        <div class="kpi-value" id="todayUsers">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Tháng này</div>
+        <div class="kpi-value" id="monthUsers">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Năm nay</div>
+        <div class="kpi-value" id="yearUsers">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+      <!-- TABLE -->
+      <div class="">
+        <h2>Chi tiết doanh thu</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Số đơn</th>
+              <th>Doanh thu</th>
+            </tr>
+          </thead>
+          <tbody id="revenueTable"></tbody>
+        </table>
+      </div>
+
+      <!-- CHART -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3>Doanh thu</h3>
+          <select id="filter">
+            <option value="day">Ngày</option>
+            <option value="week">Tuần</option>
+            <option value="month" selected>Tháng</option>
+            <option value="year">Năm</option>
+          </select>
+        </div>
+
+        <canvas id="revenueChart" height="120"></canvas>
+      </div>
+
+  </div>
+</div>
+</div>
+</div>
+
+<script>
+let chart;
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadUsers();
+  loadRevenue("month");
+  document.getElementById("filter").onchange = e =>
+    loadRevenue(e.target.value);
+});
+
+async function loadUsers() {
+  const res = await fetch("/api/report/users");
+  const data = await res.json();
+  totalUsers.innerText = data.totalUsers;
+  todayUsers.innerText = data.todayUsers;
+  monthUsers.innerText = data.monthUsers;
+  yearUsers.innerText = data.yearUsers;
+}
+
+async function loadRevenue(type) {
+  const res = await fetch(`/api/report/revenue?type=${type}`);
+  const { data } = await res.json();
+
+  const labels = data.map(r => Object.values(r._id).join("/"));
+  const revenues = data.map(r => r.revenue);
+
+  renderChart(labels, revenues);
+
+  revenueTable.innerHTML = data.map(r => `
+    <tr>
+      <td>${Object.values(r._id).join("/")}</td>
+      <td>${r.totalOrders}</td>
+      <td>${r.revenue.toLocaleString("vi-VN")} ₫</td>
+    </tr>
+  `).join("");
+}
+
+function renderChart(labels, revenues) {
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById("revenueChart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        data: revenues,
+        borderColor: "#000",
+        backgroundColor: "rgba(255,230,230,.7)",
+        fill: true,
+        tension: .35
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+</script>

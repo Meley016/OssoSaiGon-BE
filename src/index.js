@@ -33,7 +33,7 @@ const mainCategoryRoutes = require("./routes/mainCategories");
 const paymentRoutes = require("./routes/payment");
 const footerRoutes = require("./routes/footer");
 const preorderRoutes = require("./routes/preorder")
-
+const statRoutes = require("./routes/adminStats")
 // === CONTROLLER ===
 const dashboardController = require("./controllers/dashboardController");
 
@@ -211,7 +211,7 @@ app.use("/api/promotions", promotionRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/wishlist", wishlistRoutes);
-app.use("/api/statistics", statisticsRoutes);
+// app.use("/api/statistics", statisticsRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/banners", bannerRoutes);
 app.use("/api/main-categories", mainCategoryRoutes);
@@ -220,6 +220,7 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/stripe", paymentRoutes);
 app.use("/api/footer", footerRoutes);
 app.use("/api/preorder", preorderRoutes);
+app.use("/api/report", statRoutes)
 /* =============================
    ✅ ADMIN ROUTES
 ============================= */
