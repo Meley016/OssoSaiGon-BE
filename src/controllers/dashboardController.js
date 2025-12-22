@@ -11,10 +11,12 @@ const Shipping = require("../models/Shipping");
 const Blog = require("../models/Blog");
 const Banner = require("../models/Banner");
 const Footer = require("../models/FooterInfo")
+const Preorder = require("../models/Preorder")
+
 // CẤU HÌNH QUYỀN TRUY CẬP THEO ROLE
 const PERMISSIONS = {
   admin: ["product", "category", "size", "color", "order", "user", "promotion", "shipping", "blog", "banner","footer",
-    "report"],
+    "report","notification"],
   writer: ["blog", "banner"],
   productAdder: ["product", "category", "size", "color", "promotion"]
 };
@@ -132,6 +134,48 @@ exports.renderSection = async (req, res) => {
       case "footer":
         data.footer = await Footer.find().sort({ createdAt: -1 }).lean();
         break;
+        
+      case "notification": {
+        const notifyTab = req.query.tab || "order";
+
+        const orderUnseen = await Order.countDocuments({ isSeen: false });
+        const preorderUnseen = await Preorder.countDocuments({ isSeen: false });
+
+        let orders = [];
+        let preorders = [];
+
+        if (notifyTab === "order") {
+            orders = await Order.find()
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .lean();
+
+          await Order.updateMany(
+            { isSeen: false },
+            { $set: { isSeen: true } }
+          );
+        }
+
+        if (notifyTab === "preorder") {
+          preorders = await Preorder.find()
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .lean();
+
+          // auto mark seen
+          await Preorder.updateMany(
+            { isSeen: false },
+            { $set: { isSeen: true } }
+          );
+        }
+
+        data.notifyTab = notifyTab;
+        data.orderUnseen = orderUnseen;
+        data.preorderUnseen = preorderUnseen;
+        data.orders = orders;
+        data.preorders = preorders;
+        break;
+      }
     }
 
     res.render("admin/dashboard", data);

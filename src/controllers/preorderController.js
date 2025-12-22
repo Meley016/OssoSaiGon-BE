@@ -1,5 +1,7 @@
 const Product = require("../models/Product");
 const { sendEmail } = require("../utils/email");
+const savePreorderSafely = require("../utils/savePreorderSafely");
+
 
 exports.createPreorder = async (req, res) => {
   try {
@@ -39,6 +41,21 @@ exports.createPreorder = async (req, res) => {
         </tr>
       `)
       .join("");
+    
+      await savePreorderSafely({
+        user: {
+          name: user?.name || "Chưa cập nhật",
+          email: user?.email || "-",
+        },
+        productId: product._id,
+        variants: outOfStockVariants.map(v => ({
+          sku: v.sku,
+          color: v.color?.name,
+          size: v.size?.name,
+          price: v.price,
+        })),
+      });
+
 
     await sendEmail({
       to: process.env.ADMIN_EMAIL,

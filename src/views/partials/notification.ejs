@@ -1,0 +1,29 @@
+<link rel="stylesheet" href="/css/notification.css" />
+<link rel="stylesheet" href="/css/globe.css" />
+
+<div class="container">
+    <div class="form-section">
+        <h2 class="notify-title">Thông báo hệ thống</h2>
+        <div class="notify-tabs">
+        <a href="?tab=order"
+            class="tab <%= notifyTab === 'order' ? 'active' : '' %>">
+            Đơn hàng
+            <% if (orderUnseen > 0) { %>
+            <span class="badge"><%= orderUnseen %></span>
+            <% } %>
+        </a>
+
+        <a href="?tab=preorder"
+            class="tab <%= notifyTab === 'preorder' ? 'active' : '' %>">
+            Preorder
+            <% if (preorderUnseen > 0) { %>
+            <span class="badge"><%= preorderUnseen %></span>
+            <% } %>
+        </a>
+        </div>
+
+        <div class="notify-body">
+        <%- include(`./notification/${notifyTab}`) %>
+        </div>
+    </div>
+</div>

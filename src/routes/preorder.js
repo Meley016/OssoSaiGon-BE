@@ -2,7 +2,23 @@ const express = require("express");
 const router = express.Router();
 const { createPreorder } = require("../controllers/preorderController");
 const { apiProtect } = require("../middlewares/auth");
+const Preorder = require("../models/Preorder");
 
 router.post("/", apiProtect, createPreorder);
+
+router.patch("/:id/contacted", apiProtect, async (req, res) => {
+  try {
+    const preorder = await Preorder.findById(req.params.id);
+    if (!preorder) return res.sendStatus(404);
+
+    preorder.contacted = !preorder.contacted;
+    await preorder.save();
+
+    res.json({ contacted: preorder.contacted });
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
 
 module.exports = router;

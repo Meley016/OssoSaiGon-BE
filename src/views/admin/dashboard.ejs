@@ -6,14 +6,35 @@
   <title>Admin</title>
   <link id="favicon" rel="icon" type="image/png" href="/images/default-logo.png" />
   <link rel="stylesheet" href="/css/dashboard.css" />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/antd/4.24.14/antd.min.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/ant-design-icons/4.7.0/anticons.min.css"
+  />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/antd/4.24.14/antd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ant-design-icons/4.7.0/index.umd.min.js"></script>
+
 </head>
 <body>
   <!-- Header -->
   <div class="header">
     <div class="logo">
-      <img id="adminLogo" src="/images/default-logo.png" alt="Logo" />
+      <a href="/admin/dashboard/product">
+        <img id="adminLogo" src="/images/default-logo.png" alt="Logo" />
+      </a>
       <h1>Admin Dashboard</h1>
+      
+      <div id="adminNotifyBell">
+      </div>
+
     </div>
+    
     <form action="/admin/logout" method="POST">
       <button type="submit" class="logout-btn">Đăng xuất</button>
     </form>
@@ -96,6 +117,24 @@
 
   <!-- Script: Toggle sidebar + Load logo -->
   <script>
+    async function loadNotifyCount() {
+      try {
+        const res = await fetch("/api/notifications/unseen-count");
+        const { total } = await res.json();
+        const notifyBadge = document.getElementById("notifyBadge");
+
+        if (total > 0) {
+          notifyBadge.textContent = total;
+          notifyBadge.style.display = "flex";
+        } else {
+          notifyBadge.style.display = "none";
+        }
+      } catch {}
+    }
+
+    loadNotifyCount();
+    setInterval(loadNotifyCount, 30000);
+
     // Toggle Sidebar
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.getElementById('mainContent');
@@ -132,6 +171,51 @@
         console.warn("Lỗi tải logo:", err.message);
       }
     });
+    const { Badge } = antd;
+    const { BellOutlined } = icons;
+
+    async function renderNotifyBell() {
+      let count = 0;
+
+      try {
+        const res = await fetch("/api/notifications/unseen-count");
+        const data = await res.json();
+        count = data.total || 0;
+      } catch (e) {}
+
+      ReactDOM.render(
+        React.createElement(
+          "a",
+          {
+            href: "/admin/dashboard/notification",
+            style: {
+              fontSize: "20px",
+              color: "#333",
+              padding: "6px",
+              borderRadius: "8px",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+            },
+          },
+          React.createElement(
+            Badge,
+            {
+              count,
+              overflowCount: 99,
+              size: "small",
+            },
+            React.createElement(BellOutlined, {
+              style: { fontSize: "20px" },
+            })
+          )
+        ),
+        document.getElementById("adminNotifyBell")
+      );
+    }
+
+    renderNotifyBell();
+    setInterval(renderNotifyBell, 30000);
   </script>
 </body>
 </html>
