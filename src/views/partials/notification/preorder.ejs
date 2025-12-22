@@ -1,0 +1,83 @@
+<style>
+    .badge-mini {
+    border: none;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    }
+
+    .badge-mini.pending {
+    background: #fde68a;
+    color: #92400e;
+    }
+
+    .badge-mini.done {
+    background: #bbf7d0;
+    color: #065f46;
+    }
+
+</style>
+<div class="notify-list">
+  <% if (!preorders.length) { %>
+    <p class="empty">Không có preorder mới</p>
+  <% } %>
+
+  <% preorders.forEach(p => { %>
+    <div class="notify-item <%= !p.isSeen ? 'unseen' : '' %>">
+      <div class="left">
+        <strong><%= p.user?.email || "Guest" %></strong>
+        <span class="sub">
+          <%= p.variants?.length || 0 %> variant
+        </span>
+      </div>
+
+      <div class="right">
+        <button
+          class="badge-mini <%= p.contacted ? 'done' : 'pending' %>"
+          data-id="<%= p._id %>"
+          data-contacted="<%= p.contacted %>"
+          onclick="toggleContacted(this)"
+        >
+          <%= p.contacted ? "Đã liên hệ" : "Chưa liên hệ" %>
+        </button>
+
+        <small>
+          <%= new Date(p.createdAt).toLocaleString("vi-VN") %>
+        </small>
+      </div>
+    </div>
+  <% }) %>
+</div>
+<script>
+async function toggleContacted(btn) {
+  const id = btn.dataset.id;
+
+  try {
+    const res = await fetch(`/api/preorder/${id}/contacted`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include", // ✅ để pass session admin
+    });
+
+    if (!res.ok) throw new Error("Request failed");
+
+    const data = await res.json();
+
+    // ✅ update UI ngay
+    btn.textContent = data.contacted ? "Đã liên hệ" : "Chưa liên hệ";
+    btn.classList.toggle("done", data.contacted);
+    btn.classList.toggle("pending", !data.contacted);
+    btn.dataset.contacted = data.contacted;
+
+  } catch (e) {
+    console.error(e);
+    alert("Không cập nhật được trạng thái");
+  }
+}
+</script>
+
+</script>

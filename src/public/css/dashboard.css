@@ -14,4 +14,79 @@ body { font-family: 'Segoe UI', sans-serif; background: #f8f9fa; min-height: 100
 .sidebar a:hover { background: #f8d7da; color: #c82333; }
 .sidebar a.active { background: #fde8e8; color: #c82333; border-left-color: #c82333; }
 
-.main { flex: 1; background: #f8f9fa; padding: 1.5rem; overflow-y: auto; }
+.main { flex: 1; background: #ffffff; padding: 1.5rem; overflow-y: auto; }
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.notification {
+  position: relative;
+}
+
+/* ===== NOTIFICATION BELL ===== */
+
+.notify-wrapper {
+  position: relative;
+}
+
+/* nút chuông */
+.notify-bell {
+  position: relative;
+  width: 32px;
+  height: 32px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 8px;
+  background: #f5f5f5;
+
+  text-decoration: none !important;
+  color: inherit;
+}
+
+.notify-bell:hover {
+  background: #FFE6E6;
+}
+
+/* icon chuông */
+.bell-icon {
+  font-size: 18px;
+  line-height: 1;
+  display: block;
+  z-index: 1;
+}
+
+/* badge số */
+.notify-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+
+  background: #ef4444;
+  color: #fff;
+
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+
+  border-radius: 999px;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* ẩn khi = 0 */
+.notify-badge.hidden {
+  display: none;
+}

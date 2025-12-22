@@ -91,7 +91,11 @@ const orderSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
-
+    isSeen: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     // Thời gian hết hạn giữ hàng (chỉ áp dụng cho đơn tạm)
     reserveExpiresAt: {
       type: Date,

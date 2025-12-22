@@ -1,0 +1,27 @@
+<div class="notify-list">
+  <% if (!orders.length) { %>
+    <p class="empty">Không có đơn hàng mới</p>
+  <% } %>
+
+  <% orders.forEach(o => { %>
+    <div class="notify-item <%= !o.seen ? 'unseen' : '' %>">
+      <div class="left">
+        <strong><%= o.orderCode %></strong>
+        <span class="sub">
+          <%= o.shippingAddress.fullName %> ·
+          <%= o.shippingAddress.phone %>
+        </span>
+      </div>
+
+      <div class="right">
+        <span class="status status-<%= o.status %>">
+          <%= o.status %>
+        </span>
+        <small>
+          <%= new Date(o.createdAt).toLocaleString("vi-VN") %>
+        </small>
+        
+      </div>
+    </div>
+  <% }) %>
+</div>
