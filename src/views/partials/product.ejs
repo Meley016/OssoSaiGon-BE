@@ -90,8 +90,42 @@
       </div>
       <div class="button-row">
         <button type="submit" class="btn-custom">Import</button>
+        <button type="button" id="btn-export" class="btn-reset">Export</button>
       </div>
+      
     </form>
+  </div>
+
+  <!--Export-->
+  <div id="exportModal" class="modal">
+    <div class="modal-content" style="max-width:600px;">
+      <span class="close" onclick="closeExportModal()">&times;</span>
+      <h3>Export sản phẩm</h3>
+
+      <div class="form-grid">
+        <select id="export-category" class="ant-input">
+          <option value="">-- Tất cả danh mục( đang phát triển) --</option>
+        </select>
+
+        <input
+          type="text"
+          id="export-brand"
+          placeholder="Brand (đang phát triển)"
+          class="ant-input"
+        />
+      </div>
+
+      <!-- 🟢 THÔNG TIN SẢN PHẨM ĐƯỢC CHỌN -->
+      <div style="margin-top:12px;font-size:13px;color:#555;">
+        <b id="export-count">0</b> sản phẩm đang được chọn từ danh sách
+      </div>
+
+      <div style="text-align:right;margin-top:16px;">
+        <button class="btn-reset" onclick="closeExportModal()">Hủy</button>
+        <button class="btn-custom" onclick="doExport('xlsx')">Export XLSX</button>
+        <button class="btn-custom" onclick="doExport('csv')">Export CSV</button>
+      </div>
+    </div>
   </div>
 
   <!-- Lọc -->
@@ -107,6 +141,13 @@
       <button id="btn-filter" class="btn-custom">Lọc</button>
       <button id="btn-reset-filter" class="btn-reset">Xóa lọc</button>
     </div>
+  </div>
+
+  <div style="margin:10px 0;">
+    <label style="cursor:pointer;font-weight:500;">
+      <input type="checkbox" id="select-all-visible" />
+      Chọn tất cả sản phẩm đang hiển thị
+    </label>
   </div>
 
   <!-- Danh sách -->
@@ -200,6 +241,7 @@ let colorsRes = [], sizesRes = [], categoriesRes = [];
 let currentFilters = {};
 let currentPage = 1;
 const limit = 21;
+let selectedProductIds = [];
 
 function showLoading(text = "Đang xử lý...") {
   const el = document.getElementById("globalLoading");
@@ -605,9 +647,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const card = document.createElement("div");
       card.className = "product-card";
-      card.onclick = () => showProductDetail(p._id);
+      card.onclick = () => {
+        if (document.querySelector(".product-checkbox:checked")) return;
+        showProductDetail(p._id);
+      };
 
       card.innerHTML = `
+      <label style="position:absolute;top:8px;left:8px;z-index:2;">
+        <input
+          type="checkbox"
+          class="product-checkbox"
+          data-id="${p._id}"
+          ${selectedProductIds.includes(p._id) ? "checked" : ""}
+          onclick="event.stopPropagation()"
+        />
+      </label>
         <img
           loading="lazy"
           src="${p.coverImage || '/imgs/placeholder.jpg'}"
@@ -640,7 +694,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       grid.appendChild(card);
     }
-
+      const selectAll = document.getElementById("select-all-visible");
+      if (selectAll) selectAll.checked = false;
     /* =====================
        PAGINATION
     ===================== */
@@ -653,6 +708,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 };
 
+  document.addEventListener("change", e => {
+    if (!e.target.classList.contains("product-checkbox")) return;
+
+    const id = e.target.dataset.id;
+
+    if (e.target.checked) {
+      if (!selectedProductIds.includes(id)) {
+        selectedProductIds.push(id);
+      }
+    } else {
+      selectedProductIds = selectedProductIds.filter(x => x !== id);
+    }
+
+    // update export count nếu modal đang mở
+    const countEl = document.getElementById("export-count");
+    if (countEl) countEl.innerText = selectedProductIds.length;
+  });
 
   // === CHI TIẾT SẢN PHẨM ===
   window.showProductDetail = async (id) => {
@@ -1003,5 +1075,82 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     pagination.innerHTML = html;
   }
+
+  document.getElementById("btn-export").onclick = () => {
+    openExportModal();
+  };
+
+  function openExportModal() {
+    document.getElementById("export-category").innerHTML =
+      `<option value="">-- Tất cả danh mục --</option>` +
+      categoriesRes.map(c => `<option value="${c._id}">${c.name}</option>`).join("");
+
+    document.getElementById("export-count").innerText =
+      selectedProductIds.length;
+
+    document.getElementById("exportModal").style.display = "block";
+  }
+  
+  function closeExportModal() {
+    document.getElementById("exportModal").style.display = "none";
+  }
+function doExport(type) {
+  const category = document.getElementById("export-category").value;
+  const brand = document.getElementById("export-brand").value.trim();
+
+  const params = new URLSearchParams({ type });
+
+  // 🟢 1. GỬI FILTER (NẾU CÓ)
+  if (category) params.append("category", category);
+  if (brand) params.append("brand", brand);
+
+  // 🟢 2. GỬI IDS ĐƯỢC CHỌN (NẾU CÓ)
+  if (selectedProductIds.length > 0) {
+    params.append("ids", selectedProductIds.join(","));
+  }
+
+  window.location.href = `/api/products/export?${params.toString()}`;
+}
+
+document.getElementById("select-all-visible")?.addEventListener("change", e => {
+  const checked = e.target.checked;
+
+  document.querySelectorAll(".product-checkbox").forEach(cb => {
+    cb.checked = checked;
+    const id = cb.dataset.id;
+
+    if (checked) {
+      if (!selectedProductIds.includes(id)) {
+        selectedProductIds.push(id);
+      }
+    } else {
+      selectedProductIds = selectedProductIds.filter(x => x !== id);
+    }
+  });
+
+  const countEl = document.getElementById("export-count");
+  if (countEl) countEl.innerText = selectedProductIds.length;
+});
+
+document.addEventListener("change", e => {
+  if (!e.target.classList.contains("product-checkbox")) return;
+
+  const id = e.target.dataset.id;
+
+  if (e.target.checked) {
+    if (!selectedProductIds.includes(id)) {
+      selectedProductIds.push(id);
+    }
+  } else {
+    selectedProductIds = selectedProductIds.filter(x => x !== id);
+
+    // 👇 THÊM
+    const selectAll = document.getElementById("select-all-visible");
+    if (selectAll) selectAll.checked = false;
+  }
+
+  const countEl = document.getElementById("export-count");
+  if (countEl) countEl.innerText = selectedProductIds.length;
+});
 
 </script>
