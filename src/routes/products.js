@@ -5,32 +5,59 @@ const uploadCSV = require("../middlewares/upload");
 const { protect, requireRole } = require("../middlewares/auth");
 const productController = require("../controllers/productController");
 
-
+// ===== EXPORT / IMPORT =====
 router.get(
-  "/by-categories",
-  productController.getProductsByCategories
+  "/export",
+  protect,
+  requireRole("productAdder", "admin"),
+  productController.exportProducts
 );
+
+router.post(
+  "/import",
+  protect,
+  requireRole("productAdder", "admin"),
+  uploadCSV.single("csvFile"),
+  productController.importProducts
+);
+
+// ===== FILTER / QUERY =====
+router.get("/by-categories", productController.getProductsByCategories);
 router.get("/by-brand", productController.getProductsByBrand);
-
-router.get(
-  "/categories-by-brand",
-  productController.getCategoriesByBrand
-);
-router.get(
-  "/colors-by-brand-category",
-  productController.getColorsByBrandCategory
-);
+router.get("/categories-by-brand", productController.getCategoriesByBrand);
+router.get("/colors-by-brand-category", productController.getColorsByBrandCategory);
 router.get("/brands", productController.getAllBrands);
 router.get("/filter", productController.filterProducts);
-
 router.get("/search", productController.searchProducts);
+
+// ===== BASE =====
 router.get("/", productController.getAllProducts);
 
+// ⚠️ LUÔN ĐẶT CUỐI
 router.get("/:id", productController.getProductById);
 
-router.post("/", protect, requireRole("productAdder", "admin"), upload, productController.createProduct);
-router.put("/:id", protect, requireRole("productAdder", "admin"), upload, productController.updateProduct);
-router.delete("/:id", protect, requireRole("productAdder", "admin"), productController.deleteProduct);
-router.post("/import", protect, requireRole("productAdder", "admin"), uploadCSV.single("csvFile"), productController.importProducts);
+// ===== CRUD =====
+router.post(
+  "/",
+  protect,
+  requireRole("productAdder", "admin"),
+  upload,
+  productController.createProduct
+);
+
+router.put(
+  "/:id",
+  protect,
+  requireRole("productAdder", "admin"),
+  upload,
+  productController.updateProduct
+);
+
+router.delete(
+  "/:id",
+  protect,
+  requireRole("productAdder", "admin"),
+  productController.deleteProduct
+);
 
 module.exports = router;
