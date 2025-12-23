@@ -101,19 +101,38 @@
     <div class="modal-content" style="max-width:600px;">
       <span class="close" onclick="closeExportModal()">&times;</span>
       <h3>Export sản phẩm</h3>
+      <div style="margin:12px 0;">
+        <label style="display:block;font-weight:600;margin-bottom:6px;">
+          Chế độ export
+        </label>
 
-      <div class="form-grid">
+        <label>
+          <input type="radio" name="export-mode" value="selected" checked />
+          Export sản phẩm đã chọn
+        </label><br>
+
+        <label>
+          <input type="radio" name="export-mode" value="filtered" />
+          Export theo bộ lọc hiện tại
+        </label><br>
+
+        <label>
+          <input type="radio" name="export-mode" value="all" />
+          Export tất cả sản phẩm
+        </label>
+      </div>
+      <!-- <div class="form-grid">
         <select id="export-category" class="ant-input">
-          <option value="">-- Tất cả danh mục( đang phát triển) --</option>
+          <option value="">-- Tất cả danh mục--</option>
         </select>
 
         <input
           type="text"
           id="export-brand"
-          placeholder="Brand (đang phát triển)"
+          placeholder="Brand "
           class="ant-input"
         />
-      </div>
+      </div> -->
 
       <!-- 🟢 THÔNG TIN SẢN PHẨM ĐƯỢC CHỌN -->
       <div style="margin-top:12px;font-size:13px;color:#555;">
@@ -146,7 +165,7 @@
   <div style="margin:10px 0;">
     <label style="cursor:pointer;font-weight:500;">
       <input type="checkbox" id="select-all-visible" />
-      Chọn tất cả sản phẩm đang hiển thị
+      Chọn trang
     </label>
   </div>
 
@@ -1080,34 +1099,47 @@ document.addEventListener("DOMContentLoaded", async () => {
     openExportModal();
   };
 
-  function openExportModal() {
-    document.getElementById("export-category").innerHTML =
-      `<option value="">-- Tất cả danh mục --</option>` +
-      categoriesRes.map(c => `<option value="${c._id}">${c.name}</option>`).join("");
+  // function openExportModal() {
+  //   document.getElementById("export-category").innerHTML =
+  //     `<option value="">-- Tất cả danh mục --</option>` +
+  //     categoriesRes.map(c => `<option value="${c._id}">${c.name}</option>`).join("");
 
-    document.getElementById("export-count").innerText =
-      selectedProductIds.length;
+  //   document.getElementById("export-count").innerText =
+  //     selectedProductIds.length;
 
-    document.getElementById("exportModal").style.display = "block";
-  }
+  //   document.getElementById("exportModal").style.display = "block";
+  // }
   
   function closeExportModal() {
     document.getElementById("exportModal").style.display = "none";
   }
 function doExport(type) {
-  const category = document.getElementById("export-category").value;
-  const brand = document.getElementById("export-brand").value.trim();
+  const mode = document.querySelector(
+    "input[name='export-mode']:checked"
+  )?.value;
 
-  const params = new URLSearchParams({ type });
+  const params = new URLSearchParams({
+    type,
+    mode
+  });
 
-  // 🟢 1. GỬI FILTER (NẾU CÓ)
-  if (category) params.append("category", category);
-  if (brand) params.append("brand", brand);
-
-  // 🟢 2. GỬI IDS ĐƯỢC CHỌN (NẾU CÓ)
-  if (selectedProductIds.length > 0) {
+  // ===== MODE: SELECTED =====
+  if (mode === "selected") {
+    if (!selectedProductIds.length) {
+      return showToast("Chưa chọn sản phẩm nào!", "error");
+    }
     params.append("ids", selectedProductIds.join(","));
   }
+
+  // ===== MODE: FILTERED =====
+  if (mode === "filtered") {
+    Object.entries(currentFilters || {}).forEach(([k, v]) => {
+      if (v) params.append(k, v);
+    });
+  }
+
+  // ===== MODE: ALL =====
+  // không cần append gì thêm
 
   window.location.href = `/api/products/export?${params.toString()}`;
 }
@@ -1152,5 +1184,17 @@ document.addEventListener("change", e => {
   const countEl = document.getElementById("export-count");
   if (countEl) countEl.innerText = selectedProductIds.length;
 });
+
+function openExportModal() {
+  document.getElementById("export-count").innerText =
+    selectedProductIds.length;
+
+  // auto chọn mode theo context
+  if (!selectedProductIds.length) {
+    document.querySelector("input[value='filtered']").checked = true;
+  }
+
+  document.getElementById("exportModal").style.display = "block";
+}
 
 </script>

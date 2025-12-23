@@ -636,44 +636,67 @@ exports.importProducts = async (req, res) => {
 };
 exports.exportProducts = async (req, res) => {
   try {
-    const { category, brand, ids, type = "xlsx" } = req.query;
+    const {
+      mode = "all",        // selected | filtered | all
+      ids,
+      category,
+      brand,
+      type = "xlsx"
+    } = req.query;
 
-    const conditions = [];
+    let query = {};
 
-    // 1️⃣ Filter theo category / brand
-    if (category || brand) {
-      const filter = {};
+    /* =========================
+       1️⃣ BUILD QUERY THEO MODE
+    ========================= */
 
+    // 🔘 EXPORT THEO ID ĐƯỢC CHỌN
+    if (mode === "selected") {
+      if (!ids) {
+        return res.status(400).json({ error: "Thiếu ids để export" });
+      }
+
+      query._id = {
+        $in: ids.split(",").map(id => new mongoose.Types.ObjectId(id))
+      };
+    }
+
+    // 🔘 EXPORT THEO FILTER (ALL PAGE)
+    else if (mode === "filtered") {
       if (category) {
-        filter.category = new mongoose.Types.ObjectId(category);
+        query.category = new mongoose.Types.ObjectId(category);
       }
 
       if (brand) {
-        filter.brand = new RegExp(`^${brand}$`, "i");
+        query.brand = new RegExp(`^${brand}$`, "i");
       }
-
-      conditions.push(filter);
     }
 
-    // 2️⃣ Sản phẩm được chọn thủ công
-    if (ids) {
-      conditions.push({
-        _id: {
-          $in: ids.split(",").map(id => new mongoose.Types.ObjectId(id))
-        }
-      });
+    // 🔘 EXPORT ALL → query = {}
+    else if (mode === "all") {
+      query = {};
     }
 
-    // 3️⃣ Build query
-    const query = conditions.length ? { $or: conditions } : {};
+    else {
+      return res.status(400).json({ error: "Mode export không hợp lệ" });
+    }
 
+    console.log("EXPORT MODE:", mode);
     console.log("EXPORT QUERY:", JSON.stringify(query, null, 2));
+
+    /* =========================
+       2️⃣ QUERY DATABASE
+    ========================= */
 
     const products = await Product.find(query)
       .populate("category", "name")
       .populate("variants.color", "name code")
       .populate("variants.size", "name code")
       .lean();
+
+    /* =========================
+       3️⃣ BUILD ROWS (VARIANT LEVEL)
+    ========================= */
 
     const rows = [];
 
@@ -692,7 +715,7 @@ exports.exportProducts = async (req, res) => {
           "Size code": v.size?.code || "",
           Price: v.price,
           Quantity: v.stockQuantity,
-          "Sub Images": (v.images || []).join(","),
+          "Sub Images": (v.images || []).join(",")
         });
       }
     }
@@ -701,16 +724,28 @@ exports.exportProducts = async (req, res) => {
       return res.status(400).json({ error: "Không có sản phẩm để export" });
     }
 
+    /* =========================
+       4️⃣ EXPORT FILE
+    ========================= */
+
     // === XLSX ===
     if (type === "xlsx") {
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Products");
 
-      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+      const buffer = XLSX.write(wb, {
+        type: "buffer",
+        bookType: "xlsx"
+      });
 
-      res.setHeader("Content-Disposition", "attachment; filename=products_export.xlsx");
-      res.type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=products_export.xlsx"
+      );
+      res.type(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
       return res.send(buffer);
     }
 
@@ -719,7 +754,10 @@ exports.exportProducts = async (req, res) => {
     const parser = new Parser({ fields: Object.keys(rows[0]) });
     const csv = parser.parse(rows);
 
-    res.setHeader("Content-Disposition", "attachment; filename=products_export.csv");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=products_export.csv"
+    );
     res.type("text/csv");
     res.send(csv);
 
