@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { createPreorder } = require("../controllers/preorderController");
+const { createPreorder, exportPreorders } = require("../controllers/preorderController");
 const { apiProtect } = require("../middlewares/auth");
 const Preorder = require("../models/Preorder");
 
@@ -34,5 +34,7 @@ router.patch("/:id/contacted", apiProtect, async (req, res) => {
     res.sendStatus(500);
   }
 });
+
+router.get("/export", apiProtect, exportPreorders);
 
 module.exports = router;
