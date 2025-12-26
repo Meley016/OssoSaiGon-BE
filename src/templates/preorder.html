@@ -1,39 +1,168 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
-  <meta charset="utf-8" />
-  <title>Preorder Notification</title>
+<meta charset="UTF-8">
+<title>Preorder Notification</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background-color: #fff0f0;
+    margin: 0;
+    padding: 0;
+    color: #333;
+  }
+  .container {
+    max-width: 700px;
+    margin: 30px auto;
+    background-color: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  }
+  .header {
+    background-color: #ffe6e6;
+    color: #000;
+    padding: 20px;
+    text-align: center;
+  }
+  .header h1 {
+    margin: 0;
+    font-size: 22px;
+  }
+  .section {
+    padding: 20px;
+    border-bottom: 1px solid #f5c2c2;
+  }
+  .section h2 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    color: #000;
+  }
+  .section img {
+    width: 250px;          
+    height: auto;
+    display: block;
+    margin: 0 auto 10px;
+    border-radius: 6px;
+  }
+  p {
+    margin: 5px 0;
+    font-size: 14px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  th, td {
+    padding: 10px;
+    border: 1px solid #f5c2c2;
+    text-align: left;
+    font-size: 14px;
+  }
+  th {
+    background-color: #ffe6e6;
+  }
+  tfoot td {
+    font-weight: 600;
+    background-color: #ffe6e6;
+  }
+  .total {
+    color: #d9534f;
+    font-weight: 700;
+  }
+  .footer {
+    padding: 15px 20px;
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+    background-color: #fff0f0;
+  }
+</style>
 </head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6;">
-  
-  <h2>🔔 PREORDER REQUEST</h2>
+<body>
+  <div class="container">
+    <!-- PHẦN TIẾNG VIỆT -->
+    <div class="header">
+      <h1>Thông báo Preorder</h1>
+    </div>
 
-  <h3>👤 THÔNG TIN KHÁCH HÀNG</h3>
-  <p><b>Tên:</b> {{userName}}</p>
-  <p><b>Email:</b> {{userEmail}}</p>
+    <div class="section">
+      <h2>Thông tin khách hàng</h2>
+      <p><b>Tên:</b> {{userName}}</p>
+      <p><b>Email:</b> {{userEmail}}</p>
+    </div>
 
-  <h3>📦 THÔNG TIN SẢN PHẨM</h3>
-  <p><b>Tên sản phẩm:</b> {{productName}}</p>
+    <div class="section">
+      <h2>Sản phẩm</h2>
+      <img src="{{productImage}}" alt="{{productName}}">
+      <p><b>Tên sản phẩm:</b> {{productName}}</p>
 
-  <table border="1" cellpadding="8" cellspacing="0" width="100%">
-    <thead>
-      <tr>
-        <th>SKU</th>
-        <th>Màu sắc</th>
-        <th>Size</th>
-        <th>Giá</th>
-        <th>Tồn kho</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{{variantTable}}}
-    </tbody>
-  </table>
+      <table>
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Màu sắc</th>
+            <th>Size</th>
+            <th>Số lượng</th>
+            <th>Giá</th>
+            <th>Tổng</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{variantTable}}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5" style="text-align:right;">Tổng đơn hàng:</td>
+            <td class="total">{{totalPrice}}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
 
-  <hr />
-  <p style="font-size:12px;color:#666">
-    Preorder được gửi lúc {{time}}
-  </p>
+    <!-- PHẦN TIẾNG ANH -->
+    <div class="header">
+      <h1>Preorder Notification</h1>
+    </div>
 
+    <div class="section">
+      <h2>Customer Info</h2>
+      <p><b>Name:</b> {{userName}}</p>
+      <p><b>Email:</b> {{userEmail}}</p>
+    </div>
+
+    <div class="section">
+      <h2>Product Info</h2>
+      <p><b>Product Name:</b> {{productName}}</p>
+      <img src="{{productImage}}" alt="{{productName}}">
+
+      <table>
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Color</th>
+            <th>Size</th>
+            <th>Qty</th>
+            <th>Price (USD)</th>
+            <th>Total (USD)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{variantTableUSD}}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5" style="text-align:right;">Order Total:</td>
+            <td class="total">${{totalPriceUSD}}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="footer">
+      Preorder được gửi lúc / Sent at {{time}}
+    </div>
+  </div>
 </body>
 </html>
