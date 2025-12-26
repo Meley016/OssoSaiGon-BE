@@ -22,6 +22,8 @@ router.post(
 );
 
 // ===== FILTER / QUERY =====
+router.get("/facets", productController.getProductFacets);
+router.get("/advanced", productController.getAllProductsAdvanced);
 router.get("/by-categories", productController.getProductsByCategories);
 router.get("/by-brand", productController.getProductsByBrand);
 router.get("/categories-by-brand", productController.getCategoriesByBrand);

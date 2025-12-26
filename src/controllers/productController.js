@@ -201,6 +201,561 @@ exports.getAllProducts = async (req, res) => {
     res.status(500).json({ error: "Lỗi tải sản phẩm", details: err.message });
   }
 };
+exports.getAllProductsAdvanced = async (req, res) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const {
+      name,
+      category,
+      brand,
+      color,
+      inStock,
+      minPrice,
+      maxPrice,
+      sort,
+    } = req.query;
+
+    /* ================= MATCH PRODUCT ================= */
+    const matchProduct = { status: "active" };
+
+    if (name) matchProduct.name = new RegExp(name, "i");
+    if (category) matchProduct.category = new mongoose.Types.ObjectId(category);
+    if (brand) matchProduct.brand = new RegExp(`^${brand}$`, "i");
+
+    /* ================= MATCH VARIANT ================= */
+    const matchVariant = {};
+
+    if (color) {
+      matchVariant["variants.color"] = new mongoose.Types.ObjectId(color);
+    }
+
+    if (inStock === "true") {
+      matchVariant["variants.stockQuantity"] = { $gt: 0 };
+    }
+
+    if (minPrice || maxPrice) {
+      matchVariant["variants.price"] = {};
+      if (minPrice) matchVariant["variants.price"].$gte = Number(minPrice);
+      if (maxPrice) matchVariant["variants.price"].$lte = Number(maxPrice);
+    }
+
+    /* ================= PIPELINE ================= */
+    const pipeline = [
+      { $match: matchProduct },
+      { $unwind: "$variants" },
+
+      ...(Object.keys(matchVariant).length
+        ? [{ $match: matchVariant }]
+        : []),
+
+      {
+        $lookup: {
+          from: "colors",
+          localField: "variants.color",
+          foreignField: "_id",
+          as: "variants.color",
+        },
+      },
+      { $unwind: { path: "$variants.color", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "sizes",
+          localField: "variants.size",
+          foreignField: "_id",
+          as: "variants.size",
+        },
+      },
+      { $unwind: { path: "$variants.size", preserveNullAndEmptyArrays: true } },
+
+      {
+        $group: {
+          _id: "$_id",
+          name: { $first: "$name" },
+          brand: { $first: "$brand" },
+          category: { $first: "$category" },
+          createdAt: { $first: "$createdAt" },
+          variants: { $push: "$variants" },
+          minPrice: { $min: "$variants.price" },
+        },
+      },
+
+      ...(sort === "price_asc" ? [{ $sort: { minPrice: 1 } }] : []),
+      ...(sort === "price_desc" ? [{ $sort: { minPrice: -1 } }] : []),
+      ...(sort === "name_asc" ? [{ $sort: { name: 1 } }] : []),
+      ...(sort === "name_desc" ? [{ $sort: { name: -1 } }] : []),
+      ...(!sort ? [{ $sort: { createdAt: -1 } }] : []),
+
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: limit }],
+          total: [{ $count: "count" }],
+        },
+      },
+    ];
+
+    const result = await Product.aggregate(pipeline);
+    const products = result[0]?.data || [];
+    const total = result[0]?.total[0]?.count || 0;
+
+    /* ================= 🔥 FORMAT GIỐNG API CŨ 🔥 ================= */
+    const formatted = products.map(p => {
+      const validVariants = (p.variants || []).filter(v =>
+        v &&
+        v.color &&
+        v.size &&
+        Array.isArray(v.images)
+      );
+
+      return {
+        _id: p._id,
+        name: p.name,
+        brand: p.brand,
+        category: p.category,
+        variants: validVariants,
+        coverImage:
+          validVariants?.[0]?.coverImage ||
+          validVariants?.[0]?.images?.[0] ||
+          "/imgs/placeholder.jpg",
+      };
+    });
+
+    res.json({
+      success: true,
+      data: formatted,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        total,
+      },
+    });
+  } catch (err) {
+    console.error("GET ALL PRODUCTS ADVANCED ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+exports.getAllBrands = async (req, res) => {
+  try {
+    const brands = await Product.distinct("brand", {
+      brand: { $ne: null, $ne: "" },
+      status: "active",
+    });
+
+    res.json(
+      brands
+        .filter(Boolean)
+        .map((b) => b.trim())
+        .sort((a, b) => a.localeCompare(b))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Cannot fetch brands" });
+  }
+};
+exports.getProductsByCategories = async (req, res) => {
+  try {
+    let {
+      categories,
+      page = 1,
+      limit = 12,
+      name,
+      color,
+      inStock,
+      minPrice,
+      maxPrice,
+      sort,
+    } = req.query;
+
+    if (!categories) {
+      return res.status(400).json({ message: "Thiếu categories" });
+    }
+
+    if (!Array.isArray(categories)) {
+      categories = [categories];
+    }
+
+    page = Number(page);
+    limit = Number(limit);
+    const skip = (page - 1) * limit;
+
+    /* ================= BASE QUERY ================= */
+    const query = {
+      category: { $in: categories },
+      status: "active",
+    };
+
+    // 🔍 SEARCH NAME (TEXT INDEX)
+    if (name) {
+      query.$text = { $search: name };
+    }
+
+    /* ================= VARIANT FILTER ================= */
+    const variantMatch = {};
+
+    // 🎨 color (ObjectId)
+    if (color) {
+      variantMatch["variants.color"] = color;
+    }
+
+    // 📦 stock
+    if (inStock === "true") {
+      variantMatch["variants.stockQuantity"] = { $gt: 0 };
+    }
+
+    // 💰 price
+    if (minPrice || maxPrice) {
+      variantMatch["variants.price"] = {};
+      if (minPrice) variantMatch["variants.price"].$gte = Number(minPrice);
+      if (maxPrice) variantMatch["variants.price"].$lte = Number(maxPrice);
+    }
+
+    Object.assign(query, variantMatch);
+
+    /* ================= SORT ================= */
+    let sortOption = { createdAt: -1 };
+
+    if (sort === "name_asc") sortOption = { name: 1 };
+    if (sort === "name_desc") sortOption = { name: -1 };
+    if (sort === "price_asc") sortOption = { "variants.price": 1 };
+    if (sort === "price_desc") sortOption = { "variants.price": -1 };
+
+    /* ================= QUERY ================= */
+    const total = await Product.countDocuments(query);
+
+    const products = await Product.find(query)
+      .populate("category", "name")
+      .populate("variants.color", "name code")
+      .populate("variants.size", "name code")
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    /* ================= FORMAT ================= */
+    const formatted = products.map((p) => {
+      let variants = p.variants || [];
+
+      // LỌC VARIANT ĐÚNG THEO FILTER
+      variants = variants.filter((v) => {
+        if (!v || typeof v.price !== "number") return false;
+        if (color && String(v.color?._id) !== String(color)) return false;
+        if (inStock === "true" && v.stockQuantity <= 0) return false;
+        if (minPrice && v.price < Number(minPrice)) return false;
+        if (maxPrice && v.price > Number(maxPrice)) return false;
+        return true;
+      });
+
+      if (variants.length === 0) return null;
+
+      return {
+        _id: p._id,
+        name: p.name,
+        coverImage:
+          p.coverImage ||
+          variants[0]?.coverImage ||
+          variants[0]?.images?.[0] ||
+          "/imgs/placeholder.jpg",
+        variants,
+      };
+    }).filter(Boolean);
+
+    res.json({
+      success: true,
+      data: formatted,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error("GET PRODUCTS BY CATEGORIES ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getProductsByBrand = async (req, res) => {
+  try {
+    let {
+      brand,
+      page = 1,
+      limit = 12,
+      name,
+      color,
+      inStock,
+      category,
+      sort,
+    } = req.query;
+
+    page = Number(page);
+    limit = Number(limit);
+    const skip = (page - 1) * limit;
+
+    /* ================= MATCH PRODUCT ================= */
+    const matchProduct = {
+      status: "active",
+    };
+
+    if (brand) matchProduct.brand = brand;
+    if (category) matchProduct.category = new mongoose.Types.ObjectId(category);
+
+    if (name) {
+      matchProduct.$text = { $search: name };
+    }
+
+    /* ================= MATCH VARIANT ================= */
+    const matchVariant = {};
+
+    if (color) {
+      matchVariant["variants.color"] = new mongoose.Types.ObjectId(color);
+    }
+
+    if (inStock === "true") {
+      matchVariant["variants.stockQuantity"] = { $gt: 0 };
+    }
+
+    /* ================= SORT ================= */
+    let sortStage = { createdAt: -1 };
+
+    if (sort === "name_asc") sortStage = { name: 1 };
+    if (sort === "name_desc") sortStage = { name: -1 };
+
+    /* ================= AGGREGATION ================= */
+    const pipeline = [
+      { $match: matchProduct },
+
+      // tách variant
+      { $unwind: "$variants" },
+
+      // lọc variant
+      { $match: matchVariant },
+
+      // lookup color
+      {
+        $lookup: {
+          from: "colors",
+          localField: "variants.color",
+          foreignField: "_id",
+          as: "variants.color",
+        },
+      },
+      { $unwind: { path: "$variants.color", preserveNullAndEmptyArrays: true } },
+
+      // lookup size
+      {
+        $lookup: {
+          from: "sizes",
+          localField: "variants.size",
+          foreignField: "_id",
+          as: "variants.size",
+        },
+      },
+      { $unwind: { path: "$variants.size", preserveNullAndEmptyArrays: true } },
+
+      // group lại product
+      {
+        $group: {
+          _id: "$_id",
+          name: { $first: "$name" },
+          brand: { $first: "$brand" },
+          category: { $first: "$category" },
+          createdAt: { $first: "$createdAt" },
+
+          variants: {
+            $push: {
+              sku: "$variants.sku",
+              price: "$variants.price",
+              stockQuantity: "$variants.stockQuantity",
+              color: "$variants.color",
+              size: "$variants.size",
+              images: "$variants.images",
+              coverImage: "$variants.coverImage",
+            },
+          },
+
+          minPrice: { $min: "$variants.price" },
+        },
+      },
+      {
+        $addFields: {
+          coverImage: {
+            $ifNull: [
+              { $arrayElemAt: ["$variants.coverImage", 0] },
+              { $arrayElemAt: ["$variants.images", 0] },
+            ],
+          },
+        },
+      },
+
+      // sort theo name
+      { $sort: sortStage },
+
+      // sort theo price (SAU group)
+      ...(sort === "price_asc"
+        ? [{ $sort: { minPrice: 1 } }]
+        : []),
+      ...(sort === "price_desc"
+        ? [{ $sort: { minPrice: -1 } }]
+        : []),
+
+      // paginate + total
+      {
+        $facet: {
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+          ],
+          total: [{ $count: "count" }],
+        },
+      },
+    ];
+
+    const result = await Product.aggregate(pipeline);
+
+    const data = result[0]?.data || [];
+    const total = result[0]?.total[0]?.count || 0;
+
+    res.json({
+      success: true,
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error("GET PRODUCTS BY BRAND AGG ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getCategoriesByBrand = async (req, res) => {
+  try {
+    const { brand } = req.query;
+    if (!brand) {
+      return res.status(400).json({ message: "Thiếu brand" });
+    }
+
+    const categoryIds = await Product.distinct("category", {
+      brand: new RegExp(`^${brand}$`, "i"),
+      status: "active",
+      category: { $ne: null },
+    });
+
+    const categories = await Category.find({
+      _id: { $in: categoryIds },
+    })
+      .select("_id name")
+      .sort({ name: 1 });
+
+    res.json({
+      success: true,
+      data: categories,
+    });
+  } catch (err) {
+    console.error("GET CATEGORIES BY BRAND ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+exports.getColorsByBrandCategory = async (req, res) => {
+  try {
+    const { brand, category } = req.query;
+
+    if (!brand) {
+      return res.status(400).json({ message: "Thiếu brand" });
+    }
+
+    const matchProduct = {
+      status: "active",
+      brand: new RegExp(`^${brand}$`, "i"),
+    };
+
+    if (category) {
+      matchProduct.category = new mongoose.Types.ObjectId(category);
+    }
+
+    const colorIds = await Product.aggregate([
+      { $match: matchProduct },
+      { $unwind: "$variants" },
+      {
+        $match: {
+          "variants.color": { $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: "$variants.color",
+        },
+      },
+    ]);
+
+    const ids = colorIds.map(c => c._id);
+
+    const colors = await Color.find({
+      _id: { $in: ids },
+    }).select("_id name code");
+
+    res.json({
+      success: true,
+      data: colors,
+    });
+  } catch (err) {
+    console.error("GET COLORS BY BRAND CATEGORY ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+exports.getProductFacets = async (req, res) => {
+  try {
+    const { brand, category } = req.query;
+
+    const matchProduct = { status: "active" };
+
+    if (brand) {
+      matchProduct.brand = new RegExp(`^${brand}$`, "i");
+    }
+
+    if (category) {
+      matchProduct.category = new mongoose.Types.ObjectId(category);
+    }
+
+    const result = await Product.aggregate([
+      { $match: matchProduct },
+      { $unwind: "$variants" },
+      {
+        $match: {
+          "variants.price": { $ne: null },
+          "variants.color": { $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          brands: { $addToSet: "$brand" },
+          categories: { $addToSet: "$category" },
+          colors: { $addToSet: "$variants.color" },
+        },
+      },
+    ]);
+
+    const facet = result[0] || {};
+
+    res.json({
+      success: true,
+      data: {
+        brands: (facet.brands || []).sort(),
+        categories: await Category.find({
+          _id: { $in: facet.categories || [] },
+        }).select("_id name"),
+        colors: await Color.find({
+          _id: { $in: facet.colors || [] },
+        }).select("_id name code"),
+      },
+    });
+  } catch (err) {
+    console.error("FACETS ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 // === GET BY ID ===
 exports.getProductById = async (req, res) => {
@@ -949,371 +1504,3 @@ exports.deleteProduct = async (req, res) => {
     res.status(500).json({ error: "Lỗi xóa", details: err.message });
   }
 };
-exports.getAllBrands = async (req, res) => {
-  try {
-    const brands = await Product.distinct("brand", {
-      brand: { $ne: null, $ne: "" },
-      status: "active",
-    });
-
-    res.json(
-      brands
-        .filter(Boolean)
-        .map((b) => b.trim())
-        .sort((a, b) => a.localeCompare(b))
-    );
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Cannot fetch brands" });
-  }
-};
-exports.getProductsByCategories = async (req, res) => {
-  try {
-    let {
-      categories,
-      page = 1,
-      limit = 12,
-      name,
-      color,
-      inStock,
-      minPrice,
-      maxPrice,
-      sort,
-    } = req.query;
-
-    if (!categories) {
-      return res.status(400).json({ message: "Thiếu categories" });
-    }
-
-    if (!Array.isArray(categories)) {
-      categories = [categories];
-    }
-
-    page = Number(page);
-    limit = Number(limit);
-    const skip = (page - 1) * limit;
-
-    /* ================= BASE QUERY ================= */
-    const query = {
-      category: { $in: categories },
-      status: "active",
-    };
-
-    // 🔍 SEARCH NAME (TEXT INDEX)
-    if (name) {
-      query.$text = { $search: name };
-    }
-
-    /* ================= VARIANT FILTER ================= */
-    const variantMatch = {};
-
-    // 🎨 color (ObjectId)
-    if (color) {
-      variantMatch["variants.color"] = color;
-    }
-
-    // 📦 stock
-    if (inStock === "true") {
-      variantMatch["variants.stockQuantity"] = { $gt: 0 };
-    }
-
-    // 💰 price
-    if (minPrice || maxPrice) {
-      variantMatch["variants.price"] = {};
-      if (minPrice) variantMatch["variants.price"].$gte = Number(minPrice);
-      if (maxPrice) variantMatch["variants.price"].$lte = Number(maxPrice);
-    }
-
-    Object.assign(query, variantMatch);
-
-    /* ================= SORT ================= */
-    let sortOption = { createdAt: -1 };
-
-    if (sort === "name_asc") sortOption = { name: 1 };
-    if (sort === "name_desc") sortOption = { name: -1 };
-    if (sort === "price_asc") sortOption = { "variants.price": 1 };
-    if (sort === "price_desc") sortOption = { "variants.price": -1 };
-
-    /* ================= QUERY ================= */
-    const total = await Product.countDocuments(query);
-
-    const products = await Product.find(query)
-      .populate("category", "name")
-      .populate("variants.color", "name code")
-      .populate("variants.size", "name code")
-      .sort(sortOption)
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
-    /* ================= FORMAT ================= */
-    const formatted = products.map((p) => {
-      let variants = p.variants || [];
-
-      // LỌC VARIANT ĐÚNG THEO FILTER
-      variants = variants.filter((v) => {
-        if (!v || typeof v.price !== "number") return false;
-        if (color && String(v.color?._id) !== String(color)) return false;
-        if (inStock === "true" && v.stockQuantity <= 0) return false;
-        if (minPrice && v.price < Number(minPrice)) return false;
-        if (maxPrice && v.price > Number(maxPrice)) return false;
-        return true;
-      });
-
-      if (variants.length === 0) return null;
-
-      return {
-        _id: p._id,
-        name: p.name,
-        coverImage:
-          p.coverImage ||
-          variants[0]?.coverImage ||
-          variants[0]?.images?.[0] ||
-          "/imgs/placeholder.jpg",
-        variants,
-      };
-    }).filter(Boolean);
-
-    res.json({
-      success: true,
-      data: formatted,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    });
-  } catch (err) {
-    console.error("GET PRODUCTS BY CATEGORIES ERROR:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-exports.getProductsByBrand = async (req, res) => {
-  try {
-    let {
-      brand,
-      page = 1,
-      limit = 12,
-      name,
-      color,
-      inStock,
-      category,
-      sort,
-    } = req.query;
-
-    page = Number(page);
-    limit = Number(limit);
-    const skip = (page - 1) * limit;
-
-    /* ================= MATCH PRODUCT ================= */
-    const matchProduct = {
-      status: "active",
-    };
-
-    if (brand) matchProduct.brand = brand;
-    if (category) matchProduct.category = new mongoose.Types.ObjectId(category);
-
-    if (name) {
-      matchProduct.$text = { $search: name };
-    }
-
-    /* ================= MATCH VARIANT ================= */
-    const matchVariant = {};
-
-    if (color) {
-      matchVariant["variants.color"] = new mongoose.Types.ObjectId(color);
-    }
-
-    if (inStock === "true") {
-      matchVariant["variants.stockQuantity"] = { $gt: 0 };
-    }
-
-    /* ================= SORT ================= */
-    let sortStage = { createdAt: -1 };
-
-    if (sort === "name_asc") sortStage = { name: 1 };
-    if (sort === "name_desc") sortStage = { name: -1 };
-
-    /* ================= AGGREGATION ================= */
-    const pipeline = [
-      { $match: matchProduct },
-
-      // tách variant
-      { $unwind: "$variants" },
-
-      // lọc variant
-      { $match: matchVariant },
-
-      // lookup color
-      {
-        $lookup: {
-          from: "colors",
-          localField: "variants.color",
-          foreignField: "_id",
-          as: "variants.color",
-        },
-      },
-      { $unwind: { path: "$variants.color", preserveNullAndEmptyArrays: true } },
-
-      // lookup size
-      {
-        $lookup: {
-          from: "sizes",
-          localField: "variants.size",
-          foreignField: "_id",
-          as: "variants.size",
-        },
-      },
-      { $unwind: { path: "$variants.size", preserveNullAndEmptyArrays: true } },
-
-      // group lại product
-      {
-        $group: {
-          _id: "$_id",
-          name: { $first: "$name" },
-          brand: { $first: "$brand" },
-          category: { $first: "$category" },
-          createdAt: { $first: "$createdAt" },
-
-          variants: {
-            $push: {
-              sku: "$variants.sku",
-              price: "$variants.price",
-              stockQuantity: "$variants.stockQuantity",
-              color: "$variants.color",
-              size: "$variants.size",
-              images: "$variants.images",
-              coverImage: "$variants.coverImage",
-            },
-          },
-
-          minPrice: { $min: "$variants.price" },
-        },
-      },
-      {
-        $addFields: {
-          coverImage: {
-            $ifNull: [
-              { $arrayElemAt: ["$variants.coverImage", 0] },
-              { $arrayElemAt: ["$variants.images", 0] },
-            ],
-          },
-        },
-      },
-
-      // sort theo name
-      { $sort: sortStage },
-
-      // sort theo price (SAU group)
-      ...(sort === "price_asc"
-        ? [{ $sort: { minPrice: 1 } }]
-        : []),
-      ...(sort === "price_desc"
-        ? [{ $sort: { minPrice: -1 } }]
-        : []),
-
-      // paginate + total
-      {
-        $facet: {
-          data: [
-            { $skip: skip },
-            { $limit: limit },
-          ],
-          total: [{ $count: "count" }],
-        },
-      },
-    ];
-
-    const result = await Product.aggregate(pipeline);
-
-    const data = result[0]?.data || [];
-    const total = result[0]?.total[0]?.count || 0;
-
-    res.json({
-      success: true,
-      data,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    });
-  } catch (err) {
-    console.error("GET PRODUCTS BY BRAND AGG ERROR:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-exports.getCategoriesByBrand = async (req, res) => {
-  try {
-    const { brand } = req.query;
-    if (!brand) {
-      return res.status(400).json({ message: "Thiếu brand" });
-    }
-
-    const categoryIds = await Product.distinct("category", {
-      brand: new RegExp(`^${brand}$`, "i"),
-      status: "active",
-      category: { $ne: null },
-    });
-
-    const categories = await Category.find({
-      _id: { $in: categoryIds },
-    })
-      .select("_id name")
-      .sort({ name: 1 });
-
-    res.json({
-      success: true,
-      data: categories,
-    });
-  } catch (err) {
-    console.error("GET CATEGORIES BY BRAND ERROR:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-exports.getColorsByBrandCategory = async (req, res) => {
-  try {
-    const { brand, category } = req.query;
-
-    if (!brand) {
-      return res.status(400).json({ message: "Thiếu brand" });
-    }
-
-    const matchProduct = {
-      status: "active",
-      brand: new RegExp(`^${brand}$`, "i"),
-    };
-
-    if (category) {
-      matchProduct.category = new mongoose.Types.ObjectId(category);
-    }
-
-    const colorIds = await Product.aggregate([
-      { $match: matchProduct },
-      { $unwind: "$variants" },
-      {
-        $match: {
-          "variants.color": { $ne: null },
-        },
-      },
-      {
-        $group: {
-          _id: "$variants.color",
-        },
-      },
-    ]);
-
-    const ids = colorIds.map(c => c._id);
-
-    const colors = await Color.find({
-      _id: { $in: ids },
-    }).select("_id name code");
-
-    res.json({
-      success: true,
-      data: colors,
-    });
-  } catch (err) {
-    console.error("GET COLORS BY BRAND CATEGORY ERROR:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
