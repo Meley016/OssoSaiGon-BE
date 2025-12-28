@@ -149,29 +149,85 @@ exports.getPreorders = async (req, res) => {
 
 exports.exportPreorders = async (req, res) => {
   try {
-    const preorders = await Preorder.find().lean();
+    const { from, to, contacted } = req.query;
+    const query = {};
+
+    if (from || to) {
+      query.createdAt = {};
+      if (from) query.createdAt.$gte = new Date(from);
+      if (to) {
+        const end = new Date(to);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
+
+    if (contacted === "true") query.contacted = true;
+    if (contacted === "false") query.contacted = false;
+
+    const preorders = await Preorder.find(query).lean();
 
     const rows = preorders.flatMap(p =>
       p.items.map(i => ({
         customer: p.user.email,
         sku: i.sku,
-        color: i.color.name,
-        size: i.size.name,
+        color: i.color?.name || "-",
+        size: i.size?.name || "-",
         quantity: i.quantity,
         price: i.price,
-        createdAt: p.createdAt,
+        contacted: p.contacted ? "Đã liên hệ" : "Chưa liên hệ",
+        createdAt: p.createdAt.toLocaleString("vi-VN"),
       }))
     );
 
     const parser = new Parser();
     const csv = parser.parse(rows);
 
-   
     res.header("Content-Type", "text/csv; charset=UTF-8");
     res.attachment("preorders.csv");
-    res.send('\uFEFF' + csv); 
+    res.send("\uFEFF" + csv);
   } catch (err) {
     console.error("❌ exportPreorders error:", err);
     res.status(500).json({ error: "Không thể xuất preorder" });
+  }
+};
+
+exports.filterPreorders = async (req, res) => {
+  try {
+    const { from, to, contacted } = req.query;
+    const query = {};
+
+    // 📅 lọc theo ngày tạo
+    if (from || to) {
+      query.createdAt = {};
+
+      if (from) {
+        const start = new Date(from + "T00:00:00+07:00");
+        query.createdAt.$gte = start;
+      }
+
+      if (to) {
+        const end = new Date(to + "T23:59:59+07:00");
+        query.createdAt.$lte = end;
+      }
+    }
+
+    // 🔖 lọc theo trạng thái liên hệ
+    if (contacted === "true") {
+      query.contacted = true;
+    }
+
+    if (contacted === "false") {
+      query.contacted = false;
+    }
+
+    const preorders = await Preorder.find(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json(preorders);
+  } catch (err) {
+    console.error("❌ filterPreorders error:", err);
+    res.status(500).json({ error: "Không thể lọc preorder" });
   }
 };
