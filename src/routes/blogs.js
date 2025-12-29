@@ -5,6 +5,15 @@ const upload = require("../middlewares/uploadImagesCloudinary");
 const { protect, apiProtect, requireRole } = require("../middlewares/auth");
 const Blog = require("../models/Blog");
 
+router.post("/quill-image", upload, (req, res) => {
+  const file = req.files?.find(f => f.fieldname === "quillImage");
+  if (!file) {
+    return res.status(400).json({ error: "Upload ảnh thất bại" });
+  }
+
+  res.json({ url: file.path });
+});
+
 router.get("/", blogCtrl.getBlogs); // public
 router.post("/", protect, requireRole("writer", "admin"), upload, blogCtrl.createBlog);
 router.put("/:id", protect, requireRole("writer", "admin"), upload, blogCtrl.updateBlog);

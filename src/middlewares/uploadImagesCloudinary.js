@@ -29,6 +29,9 @@ const storage = new CloudinaryStorage({
     else if (file.fieldname === "blogImages") {
       folder = "oso/blogs";
     }
+    else if (file.fieldname === "quillImage") {
+      folder = "oso/blogs/content";
+    }
 
     // ✅ Ảnh banner
     else if (file.fieldname === "bannerImage") {
