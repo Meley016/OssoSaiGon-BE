@@ -1,10 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const { createPreorder, exportPreorders } = require("../controllers/preorderController");
+const { createPreorder, exportPreorders, filterPreorders } = require("../controllers/preorderController");
 const { apiProtect } = require("../middlewares/auth");
 const Preorder = require("../models/Preorder");
 
 router.post("/", apiProtect, createPreorder);
+
+router.get("/filter", filterPreorders);
 
 router.get("/my", apiProtect, async (req, res) => {
   try {

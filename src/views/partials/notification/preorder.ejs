@@ -1,3 +1,5 @@
+<link rel="stylesheet" href="/css/globe.css" />
+
 <style>
 /* ====== NOTIFY ITEM ====== */
 .notify-item { 
@@ -6,7 +8,9 @@
   border-radius: 6px; 
   background: #fff; 
   display: flex; 
+  justify-content: flex-start;
   flex-direction: column;
+  align-items: flex-start;
 }
 
 .notify-item.unseen { border: 1px solid #fca5a5; }
@@ -99,9 +103,34 @@
   }
   .details-table { min-width: 100%; }
 }
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.filter-bar input,
+.filter-bar select,
+.filter-bar button {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+}
+
 </style>
 
-<button class="export-btn" onclick="exportPreorders()">Export Preorders CSV</button>
+<button class="export-btn" onclick="exportPreorders()">Export CSV</button>
+
+<div class="filter-bar">
+  <input type="date" id="fromDate" />
+  <input type="date" id="toDate" />
+  <select id="statusFilter">
+    <option value="">Tất cả</option>
+    <option value="false">Chưa liên hệ</option>
+    <option value="true">Đã liên hệ</option>
+  </select>
+  <button type="button" class="btn-custom" onclick="applyFilter()">Lọc</button>
+</div>
 
 <div class="notify-list">
   <% if (!preorders.length) { %>
@@ -173,6 +202,122 @@
 </div>
 
 <script>
+/* ================= APPLY FILTER ================= */
+async function applyFilter() {
+  const from = document.getElementById("fromDate").value;
+  const to = document.getElementById("toDate").value;
+  const contacted = document.getElementById("statusFilter").value;
+
+  const params = new URLSearchParams();
+  if (from) params.append("from", from);
+  if (to) params.append("to", to);
+  if (contacted !== "") params.append("contacted", contacted);
+
+  const res = await fetch(`/api/preorder/filter?${params}`, {
+    credentials: "include"
+  });
+
+  const preorders = await res.json();
+
+  // Render giống layout EJS ban đầu
+  const container = document.querySelector(".notify-list");
+  if (!preorders.length) {
+    container.innerHTML = `<p class="empty">Không có preorder mới</p>`;
+    return;
+  }
+
+  container.innerHTML = preorders.map(p => `
+    <div class="notify-item ${!p.isSeen ? 'unseen' : ''}">
+      <div class="notify-header" onclick="toggleDetails(this)">
+        <div class="header-top">
+          <strong>${p.user?.email || "Guest"}</strong>
+          <span>(${p.items?.length || 0} variant)</span>
+        </div>
+        <div class="badge-date">
+          <button class="badge-mini ${p.contacted ? 'done' : 'pending'}"
+                  data-id="${p._id}"
+                  data-contacted="${p.contacted}"
+                  onclick="event.stopPropagation(); toggleContacted(this);">
+            ${p.contacted ? "Đã liên hệ" : "Chưa liên hệ"}
+          </button>
+          <small>${new Date(p.createdAt).toLocaleString("vi-VN")}</small>
+        </div>
+      </div>
+
+      ${p.items && p.items.length > 0 ? `
+      <div class="details-wrapper">
+        <table class="details-table">
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Color</th>
+              <th>Size</th>
+              <th>Quantity</th>
+              <th>Price (VND)</th>
+              <th>Total (VND)</th>
+              <th>Price (USD)</th>
+              <th>Total (USD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${p.items.map(i => {
+              const total = i.price * i.quantity;
+              const exchangeRate = 30000;
+              return `
+                <tr>
+                  <td>${i.sku}</td>
+                  <td>${i.color?.name || "-"}</td>
+                  <td>${i.size?.name || "-"}</td>
+                  <td>${i.quantity}</td>
+                  <td>${i.price.toLocaleString("vi-VN")}</td>
+                  <td>${total.toLocaleString("vi-VN")}</td>
+                  <td>$${(i.price/exchangeRate).toFixed(2)}</td>
+                  <td>$${(total/exchangeRate).toFixed(2)}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+      ` : ""}
+    </div>
+  `).join("");
+}
+
+
+/* ================= RENDER ================= */
+function renderPreorders(preorders) {
+  const container = document.querySelector(".notify-list");
+
+  if (!preorders.length) {
+    container.innerHTML = `<p>Không có preorder</p>`;
+    return;
+  }
+
+  container.innerHTML = preorders.map(p => `
+    <div style="border:1px solid #ddd; padding:10px; margin-bottom:8px">
+      <strong>${p.user?.email || "Guest"}</strong><br/>
+      <small>${new Date(p.createdAt).toLocaleString("vi-VN")}</small><br/>
+      <span style="color:${p.contacted ? 'green' : 'orange'}">
+        ${p.contacted ? "Đã liên hệ" : "Chưa liên hệ"}
+      </span>
+    </div>
+  `).join("");
+}
+
+/* ================= EXPORT ================= */
+function exportPreorders() {
+  const from = document.getElementById("fromDate").value;
+  const to = document.getElementById("toDate").value;
+  const contacted = document.getElementById("statusFilter").value;
+
+  const params = new URLSearchParams();
+  if (from) params.append("from", from);
+  if (to) params.append("to", to);
+  if (contacted !== "") params.append("contacted", contacted);
+
+  window.location.href = `/api/preorder/export?${params}`;
+}
 function toggleDetails(headerEl) {
   const item = headerEl.closest('.notify-item');
   const wrapper = item.querySelector('.details-wrapper');
@@ -200,7 +345,4 @@ async function toggleContacted(btn) {
   }
 }
 
-function exportPreorders() {
-  window.location.href = '/api/preorder/export';
-}
 </script>
