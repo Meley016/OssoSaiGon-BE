@@ -41,18 +41,18 @@
   </div>
 
   <!-- Main content -->
-<div class="content">
-  <!-- Sidebar -->
-  <div class="sidebar" id="sidebar">
+  <div class="content">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      
+      <!-- Helper: Kiểm tra role được phép -->
+      <% 
+        const role = admin?.role || 'user';
+        const can = (roles) => roles.includes(role);
+      %>
 
-    <!-- Nút toggle (dùng cho mobile hoặc muốn thu gọn) -->
-    <button id="toggleSidebar" class="toggle-sidebar-btn">&lt;</button>
-
-    <% 
-      const role = admin?.role || 'user';
-      const can = (roles) => roles.includes(role);
-    %>
-        <% if (can(['admin'])) { %>
+      <!-- MENU THEO QUYỀN -->
+       <% if (can(['admin'])) { %>
           <a href="/admin/dashboard/report"
             class="<%= activeMenu === 'report' ? 'active' : '' %>">
             Báo cáo & Thống kê
@@ -102,16 +102,18 @@
       <% if (can(['admin'])) { %>
         <a href="/admin/dashboard/footer" class="<%= activeMenu === 'footer' ? 'active' : '' %>">Footer</a>
       <% } %>
-      
-  </div>
+      <button id="toggleSidebar" class="toggle-sidebar-btn">&lt;</button>
+    </div>
 
-  <!-- Main area -->
-  <div class="main" id="mainContent">
-    <%- include(`../partials/${activeMenu}`, { 
-      activeMenu, admin, orders, categories, sizes, colors, products, users, promotions, shippings, blogs, banners, footer
-    }) %>
+    <!-- Main area -->
+    <div class="main" id="mainContent">
+      <%- include(`../partials/${activeMenu}`, { 
+        activeMenu, 
+        admin, 
+        orders, categories, sizes, colors, products, users, promotions, shippings, blogs, banners, footer
+      }) %>
+    </div>
   </div>
-</div>
 
   <!-- Script: Toggle sidebar + Load logo -->
   <script>
