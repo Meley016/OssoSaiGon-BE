@@ -35,6 +35,7 @@ const footerRoutes = require("./routes/footer");
 const preorderRoutes = require("./routes/preorder")
 const statRoutes = require("./routes/adminStats")
 const notificationRoutes = require("./routes/notification");
+const newsletterRoute = require("./routes/newletter");
 
 // === CONTROLLER ===
 const dashboardController = require("./controllers/dashboardController");
@@ -223,6 +224,7 @@ app.use("/api/stripe", paymentRoutes);
 app.use("/api/footer", footerRoutes);
 app.use("/api/preorder", preorderRoutes);
 app.use("/api/report", statRoutes);
+app.use("/api/newsletter", newsletterRoute);
 app.use("/api/notifications", notificationRoutes);
 
 

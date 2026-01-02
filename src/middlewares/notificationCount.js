@@ -1,10 +1,9 @@
-const express = require("express");
-const router = express.Router();
+// middlewares/notificationCount.js
 const Order = require("../models/Order");
 const Preorder = require("../models/Preorder");
 const NewsletterContact = require("../models/NewLetterContact");
 
-router.get("/unseen-count", async (req, res) => {
+module.exports = async (req, res, next) => {
   try {
     const [
       orderUnseen,
@@ -24,29 +23,16 @@ router.get("/unseen-count", async (req, res) => {
       }),
     ]);
 
-    const total =
-      orderUnseen +
-      preorderUnseen +
-      newsletterUnseen +
-      contactUnseen;
+    res.locals.orderUnseen = orderUnseen;
+    res.locals.preorderUnseen = preorderUnseen;
+    res.locals.newsletterUnseen = newsletterUnseen;
+    res.locals.contactUnseen = contactUnseen;
+    res.locals.totalUnseen =
+      orderUnseen + preorderUnseen + newsletterUnseen + contactUnseen;
 
-    res.json({
-      order: orderUnseen,
-      preorder: preorderUnseen,
-      newsletter: newsletterUnseen,
-      contact: contactUnseen,
-      total,
-    });
+    next();
   } catch (err) {
-    console.error("unseen-count error:", err);
-    res.status(500).json({
-      order: 0,
-      preorder: 0,
-      newsletter: 0,
-      contact: 0,
-      total: 0,
-    });
+    console.error("notificationCount error:", err);
+    next();
   }
-});
-
-module.exports = router;
+};

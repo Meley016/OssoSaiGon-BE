@@ -12,6 +12,7 @@ const Blog = require("../models/Blog");
 const Banner = require("../models/Banner");
 const Footer = require("../models/FooterInfo")
 const Preorder = require("../models/Preorder")
+const NewsletterContact = require("../models/NewLetterContact");
 
 // CẤU HÌNH QUYỀN TRUY CẬP THEO ROLE
 const PERMISSIONS = {
@@ -138,33 +139,46 @@ exports.renderSection = async (req, res) => {
       case "notification": {
         const notifyTab = req.query.tab || "order";
 
-        const orderUnseen = await Order.countDocuments({ isSeen: false });
-        const preorderUnseen = await Preorder.countDocuments({ isSeen: false });
+        const [
+          orderUnseen,
+          preorderUnseen,
+          newsletterUnseen,
+          contactUnseen
+        ] = await Promise.all([
+          Order.countDocuments({ isSeen: false }),
+          Preorder.countDocuments({ isSeen: false }),
+          NewsletterContact.countDocuments({ type: "newsletter", status: "new" }),
+          NewsletterContact.countDocuments({ type: "contact", status: "new" }),
+        ]);
 
         let orders = [];
         let preorders = [];
+        let items = []; 
 
         if (notifyTab === "order") {
-            orders = await Order.find()
+          orders = await Order.find().sort({ createdAt: -1 }).limit(20).lean();
+          await Order.updateMany({ isSeen: false }, { $set: { isSeen: true } });
+        } else if (notifyTab === "preorder") {
+          preorders = await Preorder.find().sort({ createdAt: -1 }).limit(20).lean();
+          await Preorder.updateMany({ isSeen: false }, { $set: { isSeen: true } });
+        } else if (notifyTab === "newsletter") {
+          items = await NewsletterContact.find({ type: "newsletter" })
             .sort({ createdAt: -1 })
             .limit(20)
             .lean();
 
-          await Order.updateMany(
-            { isSeen: false },
+          await NewsletterContact.updateMany(
+            { type: "newsletter", isSeen: false },
             { $set: { isSeen: true } }
           );
-        }
-
-        if (notifyTab === "preorder") {
-          preorders = await Preorder.find()
+        } else if (notifyTab === "contact") {
+          items = await NewsletterContact.find({ type: "contact" })
             .sort({ createdAt: -1 })
             .limit(20)
             .lean();
 
-          // auto mark seen
-          await Preorder.updateMany(
-            { isSeen: false },
+          await NewsletterContact.updateMany(
+            { type: "contact", isSeen: false },
             { $set: { isSeen: true } }
           );
         }
@@ -172,10 +186,15 @@ exports.renderSection = async (req, res) => {
         data.notifyTab = notifyTab;
         data.orderUnseen = orderUnseen;
         data.preorderUnseen = preorderUnseen;
+        data.newsletterUnseen = newsletterUnseen;
+        data.contactUnseen = contactUnseen;
         data.orders = orders;
         data.preorders = preorders;
+        data.items = items; 
         break;
       }
+
+
     }
 
     res.render("admin/dashboard", data);

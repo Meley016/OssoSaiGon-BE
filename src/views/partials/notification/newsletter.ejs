@@ -1,0 +1,193 @@
+<link rel="stylesheet" href="/css/globe.css" />
+
+<!-- Dùng CSS giống preorder -->
+<style>
+.notify-item { 
+  margin-bottom: 10px; 
+  padding: 10px; 
+  border-radius: 6px; 
+  background: #fff; 
+  display: flex; 
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.notify-item.unseen { border: 1px solid #fca5a5; }
+
+/* ====== HEADER ====== */
+.notify-header { 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: space-between; 
+  align-items: flex-start; 
+  cursor: pointer; 
+}
+
+.notify-header .header-top {
+  display: flex; 
+  flex-wrap: wrap; 
+  justify-content: space-between; 
+  width: 100%;
+  gap: 10px;
+}
+
+.notify-header strong {
+  font-size: 14px;
+}
+
+.notify-header .badge-date {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+.details-wrapper { display: none; margin-top:8px; width:100%; overflow-x:auto; }
+.details-table { width:100%; min-width:600px; border-collapse: collapse; }
+.details-table th, .details-table td { border:1px solid #ddd; padding:6px 8px; font-size:13px; }
+.details-table th { background:#ffe6e6; font-weight:600; }
+
+.badge-mini { border:none; cursor:pointer; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+.badge-mini.pending { background:#fde68a; color:#92400e; }
+.badge-mini.done { background:#bbf7d0; color:#065f46; }
+
+.export-btn { 
+  margin-bottom: 15px; 
+  padding: 6px 12px; 
+  background: black; 
+  color: white; 
+  cursor: pointer; 
+  border-radius: 4px; 
+  font-weight: 600; 
+}
+.export-btn:hover { background: #ffe6e6; color: black; }
+
+.filter-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+.filter-bar input, .filter-bar select, .filter-bar button { padding:6px 10px; border:1px solid #ddd; }
+
+@media (max-width:600px) {
+  .notify-header .header-top { flex-direction: column; align-items:flex-start; }
+  .details-table { min-width:100%; }
+}
+</style>
+
+<!-- Export + Filter -->
+<button class="export-btn" onclick="exportItems()">Export CSV</button>
+<div class="filter-bar">
+  <input type="date" id="fromDate" />
+  <input type="date" id="toDate" />
+  <select id="statusFilter">
+    <option value="">Tất cả</option>
+    <option value="false">Chưa đọc</option>
+    <option value="true">Đã đọc</option>
+  </select>
+  <button type="button" class="btn-custom" onclick="applyFilter()">Lọc</button>
+</div>
+
+<div class="notify-list">
+  <% if (!items.length) { %>
+    <p class="empty">Không có dữ liệu</p>
+  <% } %>
+
+  <% items.forEach(n => { %>
+    <div class="notify-item <%= n.status === 'new' ? 'unseen' : '' %>">
+      <div class="notify-header" onclick="toggleDetails(this)">
+        <div class="header-top">
+          <strong><%= n.email %></strong>
+          <span><%= n.type.toUpperCase() %></span>
+        </div>
+        <div class="badge-date">
+          <button class="badge-mini <%= n.status === 'read' ? 'done' : 'pending' %>" 
+                  data-id="<%= n._id %>" 
+                  data-read="<%= n.status === 'read' %>"
+                  onclick="event.stopPropagation(); toggleRead(this)">
+            <%= n.status === 'read' ? "Đã đọc" : "Chưa đọc" %>
+          </button>
+          <small><%= new Date(n.createdAt).toLocaleString("vi-VN") %></small>
+        </div>
+      </div>
+
+      <% if (n.message) { %>
+        <div class="details-wrapper">
+          <p><%= n.message %></p>
+        </div>
+      <% } %>
+    </div>
+  <% }) %>
+</div>
+
+<script>
+function toggleDetails(headerEl) {
+  const item = headerEl.closest('.notify-item');
+  const wrapper = item.querySelector('.details-wrapper');
+  if (!wrapper) return;
+  wrapper.style.display = wrapper.style.display === 'block' ? 'none' : 'block';
+}
+
+async function toggleRead(btn) {
+  const id = btn.dataset.id;
+  try {
+    const res = await fetch(`/api/newsletter/${id}/read`, { method:"PATCH" });
+    const data = await res.json();
+    btn.textContent = data.status === "read" ? "Đã đọc" : "Chưa đọc";
+    btn.classList.toggle("done", data.status==="read");
+    btn.classList.toggle("pending", data.status!=="read");
+    btn.dataset.read = data.status==="read";
+  } catch(e) {
+    console.error(e);
+    alert("Không cập nhật được trạng thái");
+  }
+}
+
+async function applyFilter() {
+  const from = document.getElementById("fromDate").value;
+  const to = document.getElementById("toDate").value;
+  const status = document.getElementById("statusFilter").value;
+
+  const params = new URLSearchParams();
+  if(from) params.append("from", from);
+  if(to) params.append("to", to);
+  if(status!=="") params.append("read", status);
+
+  const res = await fetch(`/api/newsletter/filter?${params}`);
+  const data = await res.json();
+
+  const container = document.querySelector(".notify-list");
+  if(!data.items.length){
+    container.innerHTML = `<p class="empty">Không có dữ liệu</p>`;
+    return;
+  }
+
+  container.innerHTML = data.items.map(n => `
+    <div class="notify-item ${n.status==='new'?'unseen':''}">
+      <div class="notify-header" onclick="toggleDetails(this)">
+        <div class="header-top">
+          <strong>${n.email}</strong>
+          <span>${n.type.toUpperCase()}</span>
+        </div>
+        <div class="badge-date">
+          <button class="badge-mini ${n.status==='read'?'done':'pending'}" data-id="${n._id}" data-read="${n.status==='read'}" onclick="event.stopPropagation(); toggleRead(this)">
+            ${n.status==='read'?'Đã đọc':'Chưa đọc'}
+          </button>
+          <small>${new Date(n.createdAt).toLocaleString("vi-VN")}</small>
+        </div>
+      </div>
+      ${n.message ? `<div class="details-wrapper"><p>${n.message}</p></div>` : ''}
+    </div>
+  `).join('');
+}
+
+function exportItems() {
+  const from = document.getElementById("fromDate").value;
+  const to = document.getElementById("toDate").value;
+  const status = document.getElementById("statusFilter").value;
+
+  const params = new URLSearchParams();
+  if(from) params.append("from", from);
+  if(to) params.append("to", to);
+  if(status!=="") params.append("read", status);
+
+  window.location.href = `/api/newsletter/export?${params}`;
+}
+</script>

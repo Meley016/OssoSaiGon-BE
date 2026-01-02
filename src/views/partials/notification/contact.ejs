@@ -1,0 +1,195 @@
+<!-- views/contact.ejs -->
+<link rel="stylesheet" href="/css/globe.css" />
+
+<style>
+.notify-item { 
+  margin-bottom: 10px; 
+  padding: 10px; 
+  border-radius: 6px; 
+  background: #fff; 
+  display: flex; 
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.notify-item.unseen { border: 1px solid #fca5a5; }
+
+/* ====== HEADER ====== */
+.notify-header { 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: space-between; 
+  align-items: flex-start; 
+  cursor: pointer; 
+}
+
+.notify-header .header-top {
+  display: flex; 
+  flex-wrap: wrap; 
+  justify-content: space-between; 
+  width: 100%;
+  gap: 10px;
+}
+
+.notify-header strong {
+  font-size: 14px;
+}
+
+.notify-header .badge-date {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+.details-wrapper { display: none; margin-top:8px; width:100%; overflow-x:auto; }
+.details-wrapper p { margin: 0; }
+
+.badge-mini { border:none; cursor:pointer; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+.badge-mini.pending { background:#fde68a; color:#92400e; }
+.badge-mini.done { background:#bbf7d0; color:#065f46; }
+
+.export-btn { 
+  margin-bottom: 15px; 
+  padding: 6px 12px; 
+  background: black; 
+  color: white; 
+  cursor: pointer; 
+  border-radius: 4px; 
+  font-weight: 600; 
+}
+.export-btn:hover { background: #ffe6e6; color: black; }
+
+.filter-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+.filter-bar input, .filter-bar select, .filter-bar button { padding:6px 10px; border:1px solid #ddd; }
+
+@media (max-width:600px) {
+  .notify-header .header-top { flex-direction: column; align-items:flex-start; }
+}
+</style>
+
+ <button class="export-btn" onclick="exportContacts()">Export CSV</button>
+
+<!-- Filter + Export -->
+<div class="filter-bar">
+
+  <input type="date" id="fromDate" />
+  <input type="date" id="toDate" />
+  <select id="statusFilter">
+    <option value="">Tất cả</option>
+    <option value="new">Chưa đọc</option>
+    <option value="read">Đã đọc</option>
+  </select>
+  <button type="button" class="btn-custom" onclick="applyFilter()">Lọc</button>
+</div>
+
+<div class="notify-list">
+  <% if (!items.length) { %>
+    <p class="empty">Chưa có thông báo contact nào</p>
+  <% } else { %>
+    <% items.forEach(c => { %>
+      <div class="notify-item <%= c.status==='new' ? 'unseen' : '' %>">
+        <div class="notify-header" onclick="toggleDetails(this)">
+          <div class="header-top">
+            <strong><%= c.email %></strong>
+            <span>CONTACT</span>
+          </div>
+          <div class="badge-date">
+            <button class="badge-mini <%= c.status==='read' ? 'done' : 'pending' %>"
+                    data-id="<%= c._id %>"
+                    data-read="<%= c.status==='read' %>"
+                    onclick="event.stopPropagation(); toggleRead(this)">
+              <%= c.status==='read' ? 'Đã đọc' : 'Chưa đọc' %>
+            </button>
+            <small><%= new Date(c.createdAt).toLocaleString("vi-VN") %></small>
+          </div>
+        </div>
+
+        <% if (c.message) { %>
+          <div class="details-wrapper">
+            <p><%= c.message %></p>
+          </div>
+        <% } %>
+      </div>
+    <% }) %>
+  <% } %>
+</div>
+
+<script>
+function toggleDetails(headerEl) {
+  const item = headerEl.closest('.notify-item');
+  const wrapper = item.querySelector('.details-wrapper');
+  if (!wrapper) return;
+  wrapper.style.display = wrapper.style.display === 'block' ? 'none' : 'block';
+}
+
+async function toggleRead(btn) {
+  const id = btn.dataset.id;
+  try {
+    const res = await fetch(`/api/contact/${id}/read`, { method:"PATCH" });
+    const data = await res.json();
+    btn.textContent = data.status === "read" ? "Đã đọc" : "Chưa đọc";
+    btn.classList.toggle("done", data.status==="read");
+    btn.classList.toggle("pending", data.status!=="read");
+    btn.dataset.read = data.status==="read";
+  } catch(e) {
+    console.error(e);
+    alert("Không cập nhật được trạng thái");
+  }
+}
+
+async function applyFilter() {
+  const from = document.getElementById("fromDate").value;
+  const to = document.getElementById("toDate").value;
+  const status = document.getElementById("statusFilter").value;
+
+  const params = new URLSearchParams();
+  if(from) params.append("from", from);
+  if(to) params.append("to", to);
+  if(status) params.append("status", status);
+
+  const res = await fetch(`/api/contact/filter?${params}`);
+  const data = await res.json();
+
+  const container = document.querySelector(".notify-list");
+  if(!data.items.length){
+    container.innerHTML = `<p class="empty">Chưa có thông báo contact nào</p>`;
+    return;
+  }
+
+  // Sắp xếp mới nhất -> cũ nhất
+  data.items.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  container.innerHTML = data.items.map(c => `
+    <div class="notify-item ${c.status==='new'?'unseen':''}">
+      <div class="notify-header" onclick="toggleDetails(this)">
+        <div class="header-top">
+          <strong>${c.email}</strong>
+          <span>CONTACT</span>
+        </div>
+        <div class="badge-date">
+          <button class="badge-mini ${c.status==='read'?'done':'pending'}" data-id="${c._id}" data-read="${c.status==='read'}" onclick="event.stopPropagation(); toggleRead(this)">
+            ${c.status==='read'?'Đã đọc':'Chưa đọc'}
+          </button>
+          <small>${new Date(c.createdAt).toLocaleString("vi-VN")}</small>
+        </div>
+      </div>
+      ${c.message ? `<div class="details-wrapper"><p>${c.message}</p></div>` : ''}
+    </div>
+  `).join('');
+}
+
+function exportContacts() {
+  const from = document.getElementById("fromDate").value;
+  const to = document.getElementById("toDate").value;
+  const status = document.getElementById("statusFilter").value;
+
+  const params = new URLSearchParams();
+  if(from) params.append("from", from);
+  if(to) params.append("to", to);
+  if(status) params.append("status", status);
+
+  window.location.href = `/api/contact/export?${params}`;
+}
+</script>

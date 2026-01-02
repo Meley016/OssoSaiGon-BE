@@ -1,29 +1,107 @@
 <link rel="stylesheet" href="/css/notification.css" />
 <link rel="stylesheet" href="/css/globe.css" />
+<style>
+    .notify-tabs {
+  margin-bottom: 16px;
+}
 
+/* ===== DESKTOP ===== */
+.notify-tab-list {
+  display: flex;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+/* ===== MOBILE DROPDOWN ===== */
+.notify-dropdown {
+  display: none;
+}
+
+.notify-dropdown select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .notify-tab-list {
+    display: none;
+  }
+
+  .notify-dropdown {
+    display: block;
+  }
+}
+
+</style>
 <div class="container">
-    <div class="form-section">
-        <h2 class="notify-title">Thông báo hệ thống</h2>
-        <div class="notify-tabs">
-        <a href="?tab=order"
-            class="tab <%= notifyTab === 'order' ? 'active' : '' %>">
+  <div class="form-section">
+    <h2 class="notify-title">Thông báo hệ thống</h2>
+
+    <div class="notify-tabs">
+
+    <!-- MOBILE DROPDOWN -->
+        <div class="notify-dropdown">
+            <select
+            onchange="location.href='?tab=' + this.value"
+            >
+            <option value="order" <%= notifyTab === 'order' ? 'selected' : '' %>>
+                Đơn hàng <%= orderUnseen > 0 ? `(${orderUnseen})` : '' %>
+            </option>
+
+            <option value="preorder" <%= notifyTab === 'preorder' ? 'selected' : '' %>>
+                Preorder <%= preorderUnseen > 0 ? `(${preorderUnseen})` : '' %>
+            </option>
+
+            <option value="newsletter" <%= notifyTab === 'newsletter' ? 'selected' : '' %>>
+                Newsletter <%= newsletterUnseen > 0 ? `(${newsletterUnseen})` : '' %>
+            </option>
+
+            <option value="contact" <%= notifyTab === 'contact' ? 'selected' : '' %>>
+                Contact <%= contactUnseen > 0 ? `(${contactUnseen})` : '' %>
+            </option>
+            </select>
+        </div>
+
+        <!-- DESKTOP TABS -->
+        <div class="notify-tab-list">
+            <a href="?tab=order" class="tab <%= notifyTab === 'order' ? 'active' : '' %>">
             Đơn hàng
             <% if (orderUnseen > 0) { %>
-            <span class="badge"><%= orderUnseen %></span>
+                <span class="badge"><%= orderUnseen %></span>
             <% } %>
-        </a>
+            </a>
 
-        <a href="?tab=preorder"
-            class="tab <%= notifyTab === 'preorder' ? 'active' : '' %>">
+            <a href="?tab=preorder" class="tab <%= notifyTab === 'preorder' ? 'active' : '' %>">
             Preorder
             <% if (preorderUnseen > 0) { %>
-            <span class="badge"><%= preorderUnseen %></span>
+                <span class="badge"><%= preorderUnseen %></span>
             <% } %>
-        </a>
+            </a>
+
+            <a href="?tab=newsletter" class="tab <%= notifyTab === 'newsletter' ? 'active' : '' %>">
+            Newsletter
+            <% if (newsletterUnseen > 0) { %>
+                <span class="badge"><%= newsletterUnseen %></span>
+            <% } %>
+            </a>
+
+            <a href="?tab=contact" class="tab <%= notifyTab === 'contact' ? 'active' : '' %>">
+            Contact
+            <% if (contactUnseen > 0) { %>
+                <span class="badge"><%= contactUnseen %></span>
+            <% } %>
+            </a>
         </div>
 
-        <div class="notify-body">
-        <%- include(`./notification/${notifyTab}`) %>
         </div>
+
+
+    <div class="notify-body">
+      <%- include(`./notification/${notifyTab}`) %>
     </div>
+  </div>
 </div>

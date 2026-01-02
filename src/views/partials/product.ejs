@@ -146,7 +146,26 @@
       </div>
     </div>
   </div>
+  <div class="variant-section" style="margin-top:24px;">
+    <h4>Đánh giá & Bình luận</h4>
 
+    <table class="variant-table">
+      <thead>
+        <tr>
+          <th>Người dùng</th>
+          <th>Số sao</th>
+          <th>Nội dung</th>
+          <th>Ngày</th>
+          <th>Hành động</th>
+        </tr>
+      </thead>
+      <tbody id="reviewBody">
+        <tr>
+          <td colspan="5" style="text-align:center;">Đang tải review...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
   <!-- Lọc -->
   <div class="form-section">
     <h3>Lọc sản phẩm</h3>
@@ -777,6 +796,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }).join("") || '<tr><td colspan="5">Không có biến thể</td></tr>';
 
       document.getElementById("detailModal").style.display = "block";
+      await loadProductReviews(id);
     } catch (err) {
       showToast("Lỗi: " + err.message);
     }
@@ -1113,36 +1133,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   function closeExportModal() {
     document.getElementById("exportModal").style.display = "none";
   }
-function doExport(type) {
-  const mode = document.querySelector(
-    "input[name='export-mode']:checked"
-  )?.value;
+  function doExport(type) {
+    const mode = document.querySelector(
+      "input[name='export-mode']:checked"
+    )?.value;
 
-  const params = new URLSearchParams({
-    type,
-    mode
-  });
-
-  // ===== MODE: SELECTED =====
-  if (mode === "selected") {
-    if (!selectedProductIds.length) {
-      return showToast("Chưa chọn sản phẩm nào!", "error");
-    }
-    params.append("ids", selectedProductIds.join(","));
-  }
-
-  // ===== MODE: FILTERED =====
-  if (mode === "filtered") {
-    Object.entries(currentFilters || {}).forEach(([k, v]) => {
-      if (v) params.append(k, v);
+    const params = new URLSearchParams({
+      type,
+      mode
     });
+
+    // ===== MODE: SELECTED =====
+    if (mode === "selected") {
+      if (!selectedProductIds.length) {
+        return showToast("Chưa chọn sản phẩm nào!", "error");
+      }
+      params.append("ids", selectedProductIds.join(","));
+    }
+
+    // ===== MODE: FILTERED =====
+    if (mode === "filtered") {
+      Object.entries(currentFilters || {}).forEach(([k, v]) => {
+        if (v) params.append(k, v);
+      });
+    }
+
+    // ===== MODE: ALL =====
+    // không cần append gì thêm
+
+    window.location.href = `/api/products/export?${params.toString()}`;
   }
-
-  // ===== MODE: ALL =====
-  // không cần append gì thêm
-
-  window.location.href = `/api/products/export?${params.toString()}`;
-}
 
 document.getElementById("select-all-visible")?.addEventListener("change", e => {
   const checked = e.target.checked;
@@ -1195,6 +1215,66 @@ function openExportModal() {
   }
 
   document.getElementById("exportModal").style.display = "block";
+}
+async function loadProductReviews(productId) {
+  const body = document.getElementById("reviewBody");
+  body.innerHTML = `<tr><td colspan="5">Đang tải...</td></tr>`;
+
+  try {
+    const res = await fetch(`/api/reviews/admin/product/${productId}`);
+    if (!res.ok) throw new Error("Không thể tải review");
+
+    const reviews = await res.json();
+
+    if (!reviews.length) {
+      body.innerHTML = `<tr><td colspan="5">Chưa có đánh giá</td></tr>`;
+      return;
+    }
+
+    body.innerHTML = reviews.map(r => `
+      <tr>
+        <td>${r.user?.name || "Ẩn danh"}<br><small>${r.user?.email || ""}</small></td>
+        <td>${"⭐".repeat(r.rating)}</td>
+        <td style="max-width:260px;word-break:break-word;">
+          ${r.comment || "<i>(Không có nội dung)</i>"}
+        </td>
+        <td>${new Date(r.createdAt).toLocaleDateString()}</td>
+        <td>
+          <button
+            class="btn-reset"
+            onclick="deleteReview('${r._id}','${productId}')"
+          >
+            Xóa
+          </button>
+        </td>
+      </tr>
+    `).join("");
+
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="5">Lỗi tải review</td></tr>`;
+  }
+}
+
+async function deleteReview(reviewId, productId) {
+  if (!confirm("Xóa bình luận này?")) return;
+
+  showLoading("Đang xóa review...");
+
+  try {
+    const res = await fetch(`/api/reviews/admin/${reviewId}`, {
+      method: "DELETE"
+    });
+
+    if (!res.ok) throw new Error("Xóa thất bại");
+
+    showToast("Đã xóa review");
+    loadProductReviews(productId);
+
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    hideLoading();
+  }
 }
 
 </script>
