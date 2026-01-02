@@ -926,7 +926,7 @@ textarea:focus {
     gap: 8px;
     font-size: 14px;
   }
-
+  
   .item-card input[type="checkbox"] {
     width: 16px;
     height: 16px;

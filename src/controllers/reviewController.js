@@ -24,3 +24,21 @@ exports.addReview = async (req, res) => {
 
   res.json({ success: true, review });
 };
+
+exports.deleteReviewAdmin = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+
+    const review = await Review.findById(reviewId);
+
+    if (!review) {
+      return res.status(404).json({ msg: "Comment không tồn tại" });
+    }
+
+    await review.deleteOne();
+
+    res.json({ success: true, msg: "Đã xóa comment" });
+  } catch (error) {
+    res.status(500).json({ msg: "Lỗi xóa comment" });
+  }
+};
