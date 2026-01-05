@@ -48,12 +48,16 @@ const buildSecureHash = (params) => {
 
   return crypto
     .createHmac("sha512", vnpayConfig.hashSecret)
-    .update(Buffer.from(signData, "utf-8"))
+    .update(signData, "utf-8")
     .digest("hex");
 };
 
-const verifySecureHash = (params, secureHash) =>
-  buildSecureHash(params) === secureHash;
+
+
+const verifySecureHash = (params, secureHash) => {
+  const calculatedHash = buildSecureHash(params);
+  return calculatedHash === secureHash;
+};
 
 /* ======================= FINALIZE ORDER ======================= */
 const finalizeOrder = async (order) => {
@@ -106,9 +110,20 @@ const createVNPayUrl = async (order, req) => {
     vnp_CreateDate: formatDateVN(now),
     vnp_ExpireDate: formatDateVN(new Date(now.getTime() + 15 * 60 * 1000)),
   };
-  vnpParams.vnp_SecureHashType = "HmacSHA512";
-  vnpParams.vnp_SecureHash = buildSecureHash(vnpParams);
 
+  
+    console.log("========= VNPAY FULL DEBUG =========");
+    console.log("SIGN STRING:", signData);
+    console.log("SECURE HASH:", secureHash);
+    console.log("TMN CODE:", vnpayConfig.tmnCode);
+    console.log("HASH SECRET LENGTH:", vnpayConfig.hashSecret.length);
+    console.log("HASH SECRET RAW:", JSON.stringify(vnpayConfig.hashSecret));
+    console.log("RETURN URL:", vnpayConfig.returnUrl);
+    console.log("IP:", vnpParams.vnp_IpAddr);
+    console.log("VNP URL:", vnpayConfig.url);
+    console.log("===================================");
+
+  vnpParams.vnp_SecureHash = buildSecureHash(vnpParams);
   return `${vnpayConfig.url}?${querystring.stringify(vnpParams, { encode: false })}`;
 };
 
@@ -147,15 +162,19 @@ exports.vnpayReturn = async (req, res) => {
   }
 
   const order = await Order.findOne({ vnpayTxnRef: params.vnp_TxnRef });
-  if (!order)
+  if (!order) {
     return res.redirect(`${process.env.CLIENT_URL}/payment-failed`);
+  }
 
-  return params.vnp_ResponseCode === "00"
-    ? res.redirect(
-        `${process.env.CLIENT_URL}/payment-success?order=${order.orderCode}`
-      )
-    : res.redirect(`${process.env.CLIENT_URL}/payment-failed`);
+  if (params.vnp_ResponseCode === "00") {
+    return res.redirect(
+      `${process.env.CLIENT_URL}/payment-success?order=${order.orderCode}`
+    );
+  }
+
+  return res.redirect(`${process.env.CLIENT_URL}/payment-failed`);
 };
+
 
 /* ======================= IPN (CORE LOGIC) ======================= */
 exports.vnpayIPN = async (req, res) => {
@@ -166,14 +185,18 @@ exports.vnpayIPN = async (req, res) => {
     delete params.vnp_SecureHash;
     delete params.vnp_SecureHashType;
 
-    if (!verifySecureHash(params, secureHash))
+    if (!verifySecureHash(params, secureHash)) {
       return res.json({ RspCode: "97", Message: "Invalid signature" });
+    }
 
     const order = await Order.findOne({ vnpayTxnRef: params.vnp_TxnRef });
-    if (!order) return res.json({ RspCode: "02", Message: "Order not found" });
+    if (!order) {
+      return res.json({ RspCode: "02", Message: "Order not found" });
+    }
 
-    if (order.status === "paid")
+    if (order.status === "paid") {
       return res.json({ RspCode: "02", Message: "Already confirmed" });
+    }
 
     if (params.vnp_ResponseCode === "00") {
       order.status = "paid";
@@ -188,10 +211,10 @@ exports.vnpayIPN = async (req, res) => {
       await order.save();
     }
 
-    res.json({ RspCode: "00", Message: "Confirm Success" });
+    return res.json({ RspCode: "00", Message: "Confirm Success" });
   } catch (err) {
     console.error("VNPay IPN error:", err);
-    res.json({ RspCode: "99", Message: "Unknown error" });
+    return res.json({ RspCode: "99", Message: "Unknown error" });
   }
 };
 
