@@ -110,8 +110,10 @@ const createVNPayUrl = async (order, req) => {
     vnp_CreateDate: formatDateVN(now),
     vnp_ExpireDate: formatDateVN(new Date(now.getTime() + 15 * 60 * 1000)),
   };
-
-  
+    const signData = querystring.stringify(sortObject(vnpParams), {
+      encode: false,
+    });
+    const secureHash = buildSecureHash(vnpParams);
     console.log("========= VNPAY FULL DEBUG =========");
     console.log("SIGN STRING:", signData);
     console.log("SECURE HASH:", secureHash);
