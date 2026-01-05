@@ -114,6 +114,8 @@ const createVNPayUrl = async (order, req) => {
       encode: false,
     });
     const secureHash = buildSecureHash(vnpParams);
+    vnpParams.vnp_SecureHash = secureHash;
+
     console.log("========= VNPAY FULL DEBUG =========");
     console.log("SIGN STRING:", signData);
     console.log("SECURE HASH:", secureHash);
@@ -125,7 +127,7 @@ const createVNPayUrl = async (order, req) => {
     console.log("VNP URL:", vnpayConfig.url);
     console.log("===================================");
 
-  vnpParams.vnp_SecureHash = buildSecureHash(vnpParams);
+  // vnpParams.vnp_SecureHash = buildSecureHash(vnpParams);
   return `${vnpayConfig.url}?${querystring.stringify(vnpParams, { encode: false })}`;
 };
 
