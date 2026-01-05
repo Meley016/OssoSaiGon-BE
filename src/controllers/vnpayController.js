@@ -32,11 +32,14 @@ const sortObject = (obj) =>
 const generateTxnRef = (order) =>
   `${order.orderCode}_${crypto.randomBytes(4).toString("hex")}`;
 
-const getClientIp = (req) =>
-  req.headers["x-forwarded-for"]?.split(",")[0] ||
-  req.ip ||
-  req.connection?.remoteAddress ||
-  "";
+const getClientIp = (req) => {
+  const ip =
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.socket?.remoteAddress ||
+    "127.0.0.1";
+
+  return ip.includes("::ffff:") ? ip.replace("::ffff:", "") : ip;
+};
 
 const buildSecureHash = (params) => {
   const signData = querystring.stringify(sortObject(params), {
@@ -95,7 +98,7 @@ const createVNPayUrl = async (order, req) => {
     vnp_Amount: Math.round(order.total * 100),
     vnp_CurrCode: "VND",
     vnp_TxnRef: txnRef,
-    vnp_OrderInfo: `Thanh toan ${order.orderCode}`,
+    vnp_OrderInfo: `Thanh_toan_${order.orderCode}`,
     vnp_OrderType: "other",
     vnp_ReturnUrl: vnpayConfig.returnUrl,
     vnp_IpAddr: getClientIp(req),
@@ -103,10 +106,10 @@ const createVNPayUrl = async (order, req) => {
     vnp_CreateDate: formatDateVN(now),
     vnp_ExpireDate: formatDateVN(new Date(now.getTime() + 15 * 60 * 1000)),
   };
-
+  vnpParams.vnp_SecureHashType = "HmacSHA512";
   vnpParams.vnp_SecureHash = buildSecureHash(vnpParams);
 
-  return `${vnpayConfig.url}?${querystring.stringify(vnpParams)}`;
+  return `${vnpayConfig.url}?${querystring.stringify(vnpParams, { encode: false })}`;
 };
 
 /* ======================= FE CALL ======================= */
