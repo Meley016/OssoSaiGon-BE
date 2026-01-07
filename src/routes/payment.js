@@ -10,9 +10,9 @@ const stripeController = require("../controllers/stripeController");
 router.post("/create", apiProtect, paymentController.createPayment);
 
 // ================== VNPay ==================
-router.post("/vnpay-payment", apiProtect, vnpayController.vnpayPayment); // ✅ FE gọi endpoint này
-router.get("/vnpay-return", vnpayController.vnpayReturn); // ✅ returnUrl (redirect user)
-router.get("/vnpay-ipn", vnpayController.vnpayIPN); // ✅ ipnUrl (VNPay gọi server)
+router.post("/vnpay-payment", apiProtect, vnpayController.vnpayPayment); //  FE gọi endpoint này
+router.get("/vnpay-return", vnpayController.vnpayReturn); //  returnUrl (redirect user)
+router.get("/vnpay-ipn", vnpayController.vnpayIPN); //  ipnUrl (VNPay gọi server)
 
 // ================== PayPal ==================
 router.get("/paypal", paypalController.createPaypalPayment);

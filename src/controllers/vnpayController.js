@@ -174,32 +174,43 @@ exports.vnpayIPN = async (req, res) => {
   let log;
 
   try {
-    /* ================== 1. LOG RAW IPN ================== */
+    /* ================== 1. VERIFY CHECKSUM (BẮT BUỘC ĐẦU TIÊN) ================== */
+    const verify = vnpay.verifyIpnCall(params);
+    if (!verify.isSuccess) {
+      // LOG checksum fail (OK)
+      await IPNLog.create({
+        txnRef: params.vnp_TxnRef || 'unknown',
+        vnpParams: params,
+        clientIP,
+        status: 'error',
+        response: { RspCode: '97', Message: 'Invalid signature' },
+      });
+
+      return res.json({ RspCode: '97', Message: 'Invalid signature' });
+    }
+
+    /* ================== 2. VERIFY TMN ================== */
+    if (verify.vnp_TmnCode !== process.env.VNP_TMNCODE) {
+      await IPNLog.create({
+        txnRef: verify.vnp_TxnRef,
+        vnpParams: params,
+        clientIP,
+        status: 'error',
+        response: { RspCode: '97', Message: 'Invalid TMN code' },
+      });
+
+      return res.json({ RspCode: '97', Message: 'Invalid TMN code' });
+    }
+
+    /* ================== 3. LOG RAW IPN (LÚC NÀY MỚI LOG) ================== */
     log = await IPNLog.create({
-      txnRef: params.vnp_TxnRef || 'unknown',
+      txnRef: verify.vnp_TxnRef,
       vnpParams: params,
       clientIP,
       status: 'pending',
-      vnpResponseCode: params.vnp_ResponseCode,
-      vnpTransactionStatus: params.vnp_TransactionStatus,
+      vnpResponseCode: verify.vnp_ResponseCode,
+      vnpTransactionStatus: verify.vnp_TransactionStatus,
     });
-
-    /* ================== 2. VERIFY CHECKSUM ================== */
-    const verify = vnpay.verifyIpnCall(params);
-    if (!verify.isSuccess) {
-      log.status = 'error';
-      log.response = { RspCode: '97', Message: 'Invalid signature' };
-      await log.save();
-      return res.json(log.response);
-    }
-
-    /* ================== 3. VERIFY TMN ================== */
-    if (verify.vnp_TmnCode !== process.env.VNP_TMNCODE) {
-      log.status = 'error';
-      log.response = { RspCode: '97', Message: 'Invalid TMN code' };
-      await log.save();
-      return res.json(log.response);
-    }
 
     /* ================== 4. FIND ORDER ================== */
     const order = await Order.findOne({ vnpayTxnRef: verify.vnp_TxnRef });
@@ -210,17 +221,9 @@ exports.vnpayIPN = async (req, res) => {
       return res.json(log.response);
     }
 
-    /* ================== 5. DUPLICATE IPN ================== */
-    if (order.status === 'paid') {
-      log.status = 'duplicate';
-      log.response = { RspCode: '00', Message: 'Already confirmed' };
-      await log.save();
-      return res.json(log.response);
-    }
-
-    /* ================== 6. CHECK AMOUNT (❗ KHÔNG CHIA 100) ================== */
-    const vnpAmount = Number(verify.vnp_Amount);       // VNPay unit
-    const orderAmount = Math.round(order.total * 100); // System → VNPay unit
+    /* ================== 5. CHECK AMOUNT ================== */
+    const vnpAmount = Number(verify.vnp_Amount);
+    const orderAmount = Math.round(order.total * 100);
 
     if (vnpAmount !== orderAmount) {
       log.status = 'error';
@@ -229,13 +232,20 @@ exports.vnpayIPN = async (req, res) => {
       return res.json(log.response);
     }
 
-    /* ================== 7. CHECK RESULT ================== */
+    /* ================== 6. DUPLICATE ================== */
+    if (order.status === 'paid') {
+      log.status = 'duplicate';
+      log.response = { RspCode: '02', Message: 'Already confirmed' };
+      await log.save();
+      return res.json(log.response);
+    }
+
+    /* ================== 7. HANDLE RESULT ================== */
     const isSuccess =
       verify.vnp_ResponseCode === '00' &&
       verify.vnp_TransactionStatus === '00';
 
     if (isSuccess) {
-      // ===== SUCCESS =====
       order.status = 'paid';
       order.paidAt = new Date();
       order.vnpayTransactionNo = verify.vnp_TransactionNo;
@@ -244,12 +254,10 @@ exports.vnpayIPN = async (req, res) => {
 
       await order.save();
       await finalizeOrder(order);
-
       log.status = 'success';
     } else {
-      // ===== FAIL / CANCEL =====
       order.status =
-        verify.vnp_ResponseCode === '24' ? 'cancelled' : 'expired';
+        verify.vnp_ResponseCode === '24' ? 'cancelled' : 'failed';
       order.vnpayResponseCode = verify.vnp_ResponseCode;
 
       await order.save();
@@ -266,11 +274,11 @@ exports.vnpayIPN = async (req, res) => {
 
     if (log) {
       log.status = 'error';
-      log.response = { RspCode: '99', Message: 'Unknown error' };
+      log.response = { RspCode: '99', Message: 'System Error' };
       await log.save();
     }
 
-    return res.json({ RspCode: '99', Message: 'Unknown error' });
+    return res.json({ RspCode: '99', Message: 'System Error' });
   }
 };
 
