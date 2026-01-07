@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %> - OSO Admin</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #f8fafc;
+    }
+  </style>
+</head>
+
+<body class="h-screen w-full flex flex-col">
+
+<!-- ===== HEADER ===== -->
+<header class="bg-white shadow sticky top-0 z-50">
+  <div class="w-full px-4 md:px-8 py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+    <h1 class="text-xl md:text-2xl font-bold text-gray-800">
+      <%= title %>
+    </h1>
+
+    <div class="flex flex-wrap items-center gap-4 text-sm">
+      <span class="text-gray-700">
+        Xin chào, <%= user?.username || 'Admin' %>
+      </span>
+      <a href="/admin/dashboard/product" class="text-blue-600 hover:underline">
+        Dashboard
+      </a>
+      <form action="/admin/logout" method="POST">
+        <button type="submit" class="text-red-600 hover:underline">
+          Đăng xuất
+        </button>
+      </form>
+    </div>
+  </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<main class="flex-1 flex flex-col overflow-hidden px-3 md:px-6 py-4">
+
+  <div class="bg-white rounded-xl shadow-lg flex flex-col flex-1 overflow-hidden">
+
+    <!-- ===== FILTER ===== -->
+    <form id="filterForm" class="p-4 md:p-6 border-b">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <label class="text-sm font-medium">Từ ngày</label>
+          <input type="date" name="startDate" class="w-full mt-1 border rounded-lg p-2">
+        </div>
+
+        <div>
+          <label class="text-sm font-medium">Đến ngày</label>
+          <input type="date" name="endDate" class="w-full mt-1 border rounded-lg p-2">
+        </div>
+
+        <div>
+          <label class="text-sm font-medium">Trạng thái</label>
+          <select name="status" class="w-full mt-1 border rounded-lg p-2">
+            <option value="">Tất cả</option>
+            <option value="success">Success</option>
+            <option value="error">Error</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm font-medium">TxnRef</label>
+          <input type="text" name="txnRef" placeholder="Nhập TxnRef..." class="w-full mt-1 border rounded-lg p-2">
+        </div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap gap-3">
+        <button type="submit" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700">
+          Lọc
+        </button>
+        <button type="button" onclick="resetFilter()" class="bg-gray-300 px-5 py-2 rounded-lg">
+          Reset
+        </button>
+        <button type="button" onclick="exportCSV()" class="bg-green-600 text-white px-5 py-2 rounded-lg">
+          Export CSV
+        </button>
+      </div>
+    </form>
+
+    <!-- ===== TABLE ===== -->
+    <div class="flex-1 overflow-auto">
+      <div class="min-w-[1200px]">
+        <table class="w-full text-sm divide-y">
+          <thead>
+            <tr>
+              <th class="px-4 py-3 text-left">Thời gian</th>
+              <th class="px-4 py-3 text-left">TxnRef</th>
+              <th class="px-4 py-3 text-left">vnp_TxnRef</th>
+              <th class="px-4 py-3 text-left">Số tiền</th>
+              <th class="px-4 py-3 text-left">Trạng thái</th>
+              <th class="px-4 py-3 text-left">Response</th>
+              <th class="px-4 py-3 text-left">Message</th>
+              <th class="px-4 py-3 text-left">IP</th>
+              <th class="px-4 py-3 text-left">Lỗi</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody" class="divide-y"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== PAGINATION ===== -->
+    <div class="border-t p-4 flex justify-center items-center gap-6">
+      <button onclick="changePage(-1)" id="prevBtn" class="px-4 py-2 bg-gray-200 rounded disabled:opacity-50">
+        Trước
+      </button>
+
+      <span id="currentPage" class="font-semibold">
+        Trang 1
+      </span>
+
+      <button onclick="changePage(1)" id="nextBtn" class="px-4 py-2 bg-gray-200 rounded disabled:opacity-50">
+        Sau
+      </button>
+    </div>
+
+  </div>
+</main>
+
+  <script>
+    let currentPage = 1;
+    const limit = 20;
+
+    function fetchLogs() {
+      const form = document.getElementById('filterForm');
+      const formData = new FormData(form);
+      const params = new URLSearchParams({
+        startDate: formData.get('startDate'),
+        endDate: formData.get('endDate'),
+        status: formData.get('status'),
+        txnRef: formData.get('txnRef'),
+        page: currentPage,
+        limit: limit
+      }).toString();
+
+      axios.get(`/admin/ipn-logs/export?${params}`, { withCredentials: true })
+        .then(response => {
+          const data = response.data;
+          if (!data.success) {
+            alert('Lỗi: ' + data.msg);
+            return;
+          }
+
+          const tbody = document.getElementById('logTableBody');
+          tbody.innerHTML = '';
+
+          data.logs.forEach(log => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50 transition';
+            tr.innerHTML = `
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${new Date(log.receivedAt).toLocaleString('vi-VN')}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${log.txnRef}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${log.vnpParams?.vnp_TxnRef || '-'}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${(log.vnpParams?.vnp_Amount / 100).toLocaleString('vi-VN')} VNĐ</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${log.status === 'success' ? 'text-green-600' : 'text-red-600'}">${log.status.toUpperCase()}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${log.vnpParams?.vnp_ResponseCode || '-'}</td>
+              <td class="px-6 py-4 text-sm text-gray-500">${log.vnpParams?.vnp_ResponseCode || '-'} </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${log.clientIP}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600">${log.errorMessage || '-'}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          document.getElementById('currentPage').textContent = `Trang ${currentPage}`;
+          document.getElementById('prevBtn').disabled = currentPage === 1;
+          document.getElementById('nextBtn').disabled = data.logs.length < limit;
+        })
+        .catch(err => {
+          console.error('Lỗi fetch log:', err);
+          alert('Không thể tải log IPN');
+        });
+    }
+
+    function changePage(delta) {
+      currentPage += delta;
+      if (currentPage < 1) currentPage = 1;
+      fetchLogs();
+    }
+
+    function resetFilter() {
+      document.getElementById('filterForm').reset();
+      currentPage = 1;
+      fetchLogs();
+    }
+
+    function exportCSV() {
+      const form = document.getElementById('filterForm');
+      const formData = new FormData(form);
+      const params = new URLSearchParams({
+        startDate: formData.get('startDate'),
+        endDate: formData.get('endDate'),
+        status: formData.get('status'),
+        txnRef: formData.get('txnRef'),
+        export: 'csv'
+      }).toString();
+
+      window.location.href = `/admin/ipn-logs/export?${params}`;
+    }
+
+    document.getElementById('filterForm').addEventListener('submit', e => {
+      e.preventDefault();
+      currentPage = 1;
+      fetchLogs();
+    });
+
+    // Load ban đầu
+    fetchLogs();
+  </script>
+</body>
+</html>

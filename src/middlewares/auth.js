@@ -67,4 +67,10 @@ exports.allowRoles = (...roles) => {
     next();
   };
 };
-
+exports.requireVNPayRole = (req, res, next) => {
+  if (!req.session.admin || !['admin', 'partner-vnpay'].includes(req.session.admin.role)) {
+    req.session.returnTo = req.originalUrl;
+    return res.redirect("/admin/login");
+  }
+  next();
+};
