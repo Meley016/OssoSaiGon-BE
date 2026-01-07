@@ -39,6 +39,7 @@ router.get("/dashboard",
   (req, res) => {
     const role = req.user.role;
 
+    if (role === "admin") return res.redirect("/admin/dashboard/product");
     if (role === "writer") return res.redirect("/admin/dashboard/blog");
     if (role === "productAdder") return res.redirect("/admin/dashboard/product");
 
