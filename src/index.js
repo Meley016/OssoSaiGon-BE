@@ -9,7 +9,7 @@ const compression = require("compression"); // ✅ NÉN GZIP TỐI ƯU TỐC Đ�
 require("dotenv").config();
 const cron = require("node-cron");
 const cancelExpiredOrders = require("./utils/cancelExpired");
-
+const IpnLogsRoutes = require("./routes/ipn-logs");
 const connectDB = require("./config/database");
 const MongoStore = require("connect-mongo");
 
@@ -231,9 +231,26 @@ app.use("/api/notifications", notificationRoutes);
 /* =============================
    ✅ ADMIN ROUTES
 ============================= */
-app.use("/admin", authRoutes);
-app.get("/admin/dashboard/:section", requireAdmin, dashboardController.renderSection);
+app.use('/admin', (req, res, next) => {
+  if (
+    req.path === '/login' ||
+    req.path.startsWith('/logout') ||
+    req.path.startsWith('/forgot-password') ||
+    req.path === '/register'  
+  ) {
+    return next();  
+  }
 
+  if (!req.session.admin) {
+    req.session.returnTo = req.originalUrl;
+    return res.redirect("/admin/login");
+  }
+
+  next();
+});
+app.use("/admin", authRoutes);
+app.get("/admin/dashboard/:section", dashboardController.renderSection);
+app.use("/admin/ipn-logs", IpnLogsRoutes);
 /* =============================
    ✅ FILE DOWNLOAD
 ============================= */

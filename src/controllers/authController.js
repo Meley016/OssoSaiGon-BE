@@ -89,7 +89,7 @@ exports.login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production" ? true : false, // true khi deploy
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // none để gửi cross-domain HTTPS
-      maxAge: 8 * 60 * 60 * 1000, // 8 tiếng
+      maxAge: 24 * 60 * 60 * 1000, // 8 tiếng
     });
 
     if (["admin", "writer", "productAdder"].includes(user.role)) {
@@ -101,11 +101,17 @@ exports.login = async (req, res) => {
       };
     }
 
-    let redirectUrl = "/";
-    if (user.role === "admin") redirectUrl = "/admin/dashboard/product";
-    else if (user.role === "writer") redirectUrl = "/admin/dashboard/blog";
-    else if (user.role === "productAdder") redirectUrl = "/admin/dashboard/product";
+    let redirectUrl = req.session.returnTo || null;
+    delete req.session.returnTo;   
 
+    if (!redirectUrl) {
+      // Chỉ fallback khi KHÔNG có returnTo
+      if (user.role === "writer") {
+        redirectUrl = "/admin/dashboard/blog";
+      } else {
+        redirectUrl = "/admin/dashboard/product";  
+      }
+    }
     return res.json({
       success: true,
       message: "Đăng nhập thành công!",
