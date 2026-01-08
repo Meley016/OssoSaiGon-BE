@@ -1510,3 +1510,49 @@ exports.deleteProduct = async (req, res) => {
     res.status(500).json({ error: "Lỗi xóa", details: err.message });
   }
 };
+exports.deleteMultipleProducts = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ error: "Chưa có sản phẩm nào để xóa" });
+    }
+
+    // Lọc các id hợp lệ
+    const validIds = ids.filter(id => /^[0-9a-fA-F]{24}$/.test(id));
+
+    if (!validIds.length) {
+      return res.status(400).json({ error: "Không có ID hợp lệ để xóa" });
+    }
+
+    // Lấy danh sách sản phẩm để xóa ảnh
+    const products = await Product.find({ _id: { $in: validIds } });
+
+    for (const product of products) {
+      const safeName = (product.name || "default").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      const folder = `oso/products/${safeName}`;
+
+      try {
+        // Xóa tất cả ảnh trong folder
+        await cloudinary.api.delete_resources_by_prefix(folder);
+        await cloudinary.api.delete_folder(folder);
+        console.log(`${folder} đã xóa`);
+      } catch (err) {
+        console.log(`${folder} không tồn tại trên Cloudinary - bỏ qua`);
+      }
+    }
+
+    // Xóa sản phẩm trong database
+    const result = await Product.deleteMany({ _id: { $in: validIds } });
+
+    res.json({ 
+      success: true, 
+      deletedCount: result.deletedCount, 
+      message: `${result.deletedCount} sản phẩm đã được xóa` 
+    });
+
+  } catch (err) {
+    console.error("DELETE MULTIPLE PRODUCTS ERROR:", err);
+    res.status(500).json({ error: "Lỗi server khi xóa nhiều sản phẩm", details: err.message });
+  }
+};

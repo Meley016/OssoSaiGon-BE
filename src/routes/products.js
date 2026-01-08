@@ -4,6 +4,8 @@ const upload = require("../middlewares/uploadImagesCloudinary");
 const uploadCSV = require("../middlewares/upload");
 const { protect, requireRole } = require("../middlewares/auth");
 const productController = require("../controllers/productController");
+const Product = require("../models/Product");
+
 
 // ===== EXPORT / IMPORT =====
 router.get(
@@ -54,25 +56,12 @@ router.put(
   upload,
   productController.updateProduct
 );
-router.post("/delete-multiple", protect, async (req, res) => {
-  try {
-    const { ids } = req.body;
-    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: "Chưa có sản phẩm nào để xóa" });
 
-    await Product.deleteMany({ _id: { $in: ids } });
-
-    res.json({ success: true, deletedCount: ids.length });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Lỗi server khi xóa nhiều sản phẩm" });
-  }
-});
-
-router.delete(
-  "/:id",
+router.post(
+  "/delete-multiple",
   protect,
   requireRole("productAdder", "admin"),
-  productController.deleteProduct
+  productController.deleteMultipleProducts
 );
 
 module.exports = router;
