@@ -231,7 +231,6 @@ app.use("/api/notifications", notificationRoutes);
 /* =============================
    ✅ ADMIN ROUTES
 ============================= */
-
 app.use("/admin", authRoutes);
 app.get("/admin/dashboard/:section", dashboardController.renderSection);
 app.use("/admin/ipn-logs", IpnLogsRoutes);

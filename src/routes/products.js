@@ -54,6 +54,19 @@ router.put(
   upload,
   productController.updateProduct
 );
+router.post("/delete-multiple", apiProtect, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: "Chưa có sản phẩm nào để xóa" });
+
+    await Product.deleteMany({ _id: { $in: ids } });
+
+    res.json({ success: true, deletedCount: ids.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Lỗi server khi xóa nhiều sản phẩm" });
+  }
+});
 
 router.delete(
   "/:id",

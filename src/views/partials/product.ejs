@@ -34,6 +34,14 @@
   to { transform: rotate(360deg); }
 }
 
+/* Giới hạn description */
+#detail-description {
+  display: block;
+  max-height: 100px;      /* scroll khi dài hơn */
+  overflow-y: auto;
+  word-break: break-word;
+}
+
 </style>
 <div class="product-container">
 
@@ -181,11 +189,25 @@
     </div>
   </div>
 
-  <div style="margin:10px 0;">
-    <label style="cursor:pointer;font-weight:500;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin: 10px 0;">
+    <label style="cursor: pointer; font-weight: 500;">
       <input type="checkbox" id="select-all-visible" />
       Chọn trang
     </label>
+
+    <button 
+      id="btn-delete-selected" 
+      style="
+        background: none;
+        border: none;
+        color: #ffcccc;
+        cursor: pointer;
+        padding: 0;
+        font-size: 14px;
+      "
+    >
+      Xóa sản phẩm đã chọn
+    </button>
   </div>
 
   <!-- Danh sách -->
@@ -201,29 +223,56 @@
     <form id="edit-form" enctype="multipart/form-data" method="POST">
       <input type="hidden" id="edit-id" name="id" />
       <input type="hidden" name="keepExistingImages" value="true" />
-      <div class="form-grid">
-        <input type="text" id="edit-SKU" name="SKU" required class="ant-input" />
-        <select id="edit-category" name="category" class="ant-input" required></select>
-        <input type="text" id="edit-brand" name="brand" required class="ant-input" />
-        <input type="text" id="edit-name" name="name" required class="ant-input" />
-        <textarea id="edit-description" name="description" class="ant-input" rows="4"></textarea>
+
+      <!-- THÔNG TIN CHUNG -->
+      <div class="form-section">
+        <h4>Thông tin chung</h4>
+        <div class="form-grid">
+          <div>
+            <label for="edit-SKU">SKU</label>
+            <input type="text" id="edit-SKU" name="SKU" required class="ant-input" />
+          </div>
+
+          <div>
+            <label for="edit-category">Danh mục</label>
+            <select id="edit-category" name="category" class="ant-input" required></select>
+          </div>
+
+          <div>
+            <label for="edit-brand">Thương hiệu</label>
+            <input type="text" id="edit-brand" name="brand" required class="ant-input" />
+          </div>
+
+          <div>
+            <label for="edit-name">Tên sản phẩm</label>
+            <input type="text" id="edit-name" name="name" required class="ant-input" />
+          </div>
+
+          <div style="grid-column: span 2;">
+            <label for="edit-description">Mô tả</label>
+            <textarea id="edit-description" name="description" class="ant-input" rows="4"></textarea>
+          </div>
+        </div>
       </div>
+
+      <!-- BIẾN THỂ -->
       <div class="variant-section">
         <h4>Biến thể</h4>
         <button type="button" id="edit-addVariant" class="btn-custom">Thêm</button>
         <table class="variant-table">
           <thead>
-          <tr>
-            <th>Màu</th>
-            <th>Size</th>
-            <th>Tồn kho</th>
-            <th>Giá</th>
-            <th>Ảnh</th>
-          </tr>
+            <tr>
+              <th>Màu</th>
+              <th>Size</th>
+              <th>Tồn kho</th>
+              <th>Giá</th>
+              <th>Ảnh</th>
+            </tr>
           </thead>
           <tbody id="editVariantBody"></tbody>
         </table>
       </div>
+
       <div style="text-align:right;margin-top:20px;">
         <button type="button" class="btn-reset" onclick="closeEditModal()">Hủy</button>
         <button type="submit" class="btn-custom">Cập nhật</button>
@@ -594,18 +643,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       const res = await fetch("/api/products/import", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Lỗi import");
-      showToast(`Nhập thành công! Tạo: ${data.results.created}, Cập nhật: ${data.results.updated}`);
+
+      //  Đếm số lượng success và failed
+      const successCount = Array.isArray(data.results.success) ? data.results.success.length : 0;
+      const failedCount = Array.isArray(data.results.failed) ? data.results.failed.length : 0;
+
+      showToast(`Nhập thành công! Tạo / cập nhật: ${successCount}, Lỗi: ${failedCount}`);
+
+      // Reset form và reload danh sách sản phẩm
       e.target.reset();
-      loadProducts();
+      await loadProducts();
     } catch (err) {
       showToast("Lỗi: " + err.message);
+    } finally {
+      hideLoading();
+      btn.disabled = false;
+      btn.textContent = originalText;
     }
-    finally {
-    // 🟢 Kết thúc loading
-    hideLoading();
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
   };
 
 
@@ -798,7 +852,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.getElementById("detailModal").style.display = "block";
       await loadProductReviews(id);
     } catch (err) {
-      showToast("Lỗi: " + err.message);
+       console.warn("Chi tiết sản phẩm lỗi:", err.message);
+      // showToast("Lỗi: " + err.message);
     }
   };
 
@@ -1276,5 +1331,33 @@ async function deleteReview(reviewId, productId) {
     hideLoading();
   }
 }
+document.getElementById("btn-delete-selected")?.addEventListener("click", async () => {
+  if (!selectedProductIds.length) return showToast("Chưa chọn sản phẩm nào!", "error");
+
+  if (!confirm(`Bạn có chắc muốn xóa ${selectedProductIds.length} sản phẩm đã chọn?`)) return;
+
+  showLoading("Đang xóa sản phẩm...");
+
+  try {
+    const res = await fetch("/api/products/delete-multiple", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: selectedProductIds })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Lỗi xóa nhiều sản phẩm");
+
+    showToast(`Xóa thành công ${selectedProductIds.length} sản phẩm!`);
+    selectedProductIds = [];
+    document.getElementById("select-all-visible").checked = false;
+    loadProducts(currentFilters, currentPage);
+
+  } catch (err) {
+    showToast("Lỗi: " + err.message, "error");
+  } finally {
+    hideLoading();
+  }
+});
 
 </script>

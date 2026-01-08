@@ -1490,15 +1490,21 @@ exports.deleteProduct = async (req, res) => {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: "Không tìm thấy!" });
 
-    const safeName = product.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const safeName = (product.name || 'default').replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const folder = `oso/products/${safeName}`;
 
-    // XÓA TOÀN BỘ THƯ MỤC
-    await cloudinary.api.delete_resources_by_prefix(folder);
-    await cloudinary.api.delete_folder(folder);
+    try {
+      // Thử xóa folder → nếu không tồn tại sẽ throw, catch sẽ bỏ qua
+      await cloudinary.api.delete_resources_by_prefix(folder); // xóa tất cả ảnh bên trong
+      await cloudinary.api.delete_folder(folder); // xóa folder
+      console.log(`${folder} đã xóa`);
+    } catch (err) {
+      console.log(`${folder} không tồn tại trên Cloudinary - đã xóa sản phẩm`);
+    }
 
     await Product.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "Xóa thành công + ảnh" });
+    res.json({ success: true, message: "Xóa thành công + ảnh nếu có" });
+
   } catch (err) {
     console.error("DELETE ERROR:", err);
     res.status(500).json({ error: "Lỗi xóa", details: err.message });
