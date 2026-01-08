@@ -147,7 +147,7 @@
 
         if (data.success) {
           // KHÔNG DÙNG localStorage → DÙNG SESSION
-          window.location.href = data.redirect ;
+          window.location.href = data.redirect || '/admin/dashboard/product';
         } else {
           errorDiv.textContent = data.error || 'Đăng nhập thất bại!';
           errorDiv.style.display = 'block';
