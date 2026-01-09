@@ -30,3 +30,4 @@ router.delete("/:id", protect, requireRole("admin"), userController.deleteUser);
 router.put("/:id/password", protect, requireRole("admin"), userController.changePassword);
 
 module.exports = router;
+  
