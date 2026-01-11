@@ -12,6 +12,48 @@ exports.getBlogs = async (req, res) => {
   }
 };
 
+
+exports.getBlogsByLang = async (req, res) => {
+  try {
+    const { lang } = req.params;
+    const language = ["vi", "en"].includes(lang) ? lang : "vi";
+
+    const blogs = await Blog.find().sort({ createdAt: -1 }).lean();
+
+    const mapped = blogs.map(b => ({
+      ...b,
+      title: b.title?.[language] || b.title?.vi || "",
+      content: b.content?.[language] || b.content?.vi || "",
+      lang: language
+    }));
+
+    res.json(mapped);
+  } catch (err) {
+    console.error("❌ getBlogsByLang:", err);
+    res.status(500).json({ error: "Không thể tải blog" });
+  }
+};
+
+
+exports.getBlogDetailByLang = async (req, res) => {
+  try {
+    const { id, lang } = req.params;
+    const language = ["vi", "en"].includes(lang) ? lang : "vi";
+
+    const blog = await Blog.findById(id).lean();
+    if (!blog) return res.status(404).json({ error: "Không tìm thấy bài viết" });
+
+    res.json({
+      ...blog,
+      title: blog.title?.[language] || blog.title?.vi || "",
+      content: blog.content?.[language] || blog.content?.vi || "",
+      lang: language
+    });
+  } catch (err) {
+    console.error("❌ getBlogDetailByLang:", err);
+    res.status(500).json({ error: "Không thể tải bài viết" });
+  }
+};
 // Tạo bài viết mới (hỗ trợ song ngữ, vi required)
 exports.createBlog = async (req, res) => {
   try {
