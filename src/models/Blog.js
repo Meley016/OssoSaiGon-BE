@@ -8,8 +8,14 @@ const commentSchema = new mongoose.Schema({
 
 const blogSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true },
-    content: { type: String, required: true },
+    title: {
+      vi: { type: String, required: true },
+      en: { type: String, default: "" },
+    },
+    content: {
+      vi: { type: String, required: true },
+      en: { type: String, default: "" },
+    },
     images: [{ type: String }], // danh sách ảnh Cloudinary
     likes: {
       type: [mongoose.Schema.Types.ObjectId],

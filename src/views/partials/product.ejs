@@ -2,6 +2,164 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
 <link rel="stylesheet" href="/css/globe.css">
 <style>
+ #productGrid.grid-product {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+  gap: 24px !important;
+  margin: 32px 0 !important;
+}
+.view-toggle button:hover {
+  opacity: 0.85;
+  transform: scale(1.1);
+}
+@media (max-width: 576px) {
+  #productGrid.grid-product {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+    gap: 16px !important;
+  }
+}
+
+@media (min-width: 768px) {
+  #productGrid.grid-product {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  #productGrid.grid-product {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+  }
+}
+#productGrid.grid-product.list-view {
+  display: block !important;
+}
+
+#productGrid.grid-product.list-view .product-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  background: white;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+  flex-wrap: nowrap; /* Buộc nằm ngang, không wrap */
+  overflow: hidden;
+}
+
+#productGrid.grid-product.list-view .product-card:hover {
+  background: #f8fafc;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-2px); /* Hover mượt, nâng nhẹ */
+}
+
+/* Checkbox - Cố định 40px */
+#productGrid.grid-product.list-view .product-checkbox-wrapper {
+  flex: 0 0 40px;
+  text-align: center;
+}
+
+/* Ảnh - Cố định 100px */
+#productGrid.grid-product.list-view .product-card img {
+  flex: 0 0 100px;
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+/* Thông tin - Chiếm hết không gian còn lại, ellipsis khi dài */
+#productGrid.grid-product.list-view .product-card .info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+
+/* Tên sản phẩm - Ellipsis + hover tooltip */
+#productGrid.grid-product.list-view .product-card h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+}
+
+#productGrid.grid-product.list-view .product-card h4:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: #333;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  white-space: normal;
+  z-index: 10;
+  max-width: 300px;
+  pointer-events: none;
+}
+
+/* SKU, Giá - Ellipsis tương tự */
+#productGrid.grid-product.list-view .product-card .sku,
+#productGrid.grid-product.list-view .product-card .price-display {
+  margin: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#productGrid.grid-product.list-view .product-card .price-display {
+  font-weight: 700;
+  color: #d32f2f;
+}
+
+/* Màu sắc - Horizontal scroll nếu quá nhiều */
+#productGrid.grid-product.list-view .product-card .color-dots {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  max-width: 200px;
+}
+
+/* Hành động - Cố định 80px */
+#productGrid.grid-product.list-view .product-card-actions {
+  flex: 0 0 80px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Responsive: Mobile - Xếp dọc hoàn toàn */
+@media (max-width: 768px) {
+  #productGrid.grid-product.list-view .product-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  #productGrid.grid-product.list-view .product-card img {
+    width: 120px;
+    height: 120px;
+  }
+
+  #productGrid.grid-product.list-view .product-card .info {
+    width: 100%;
+  }
+
+  #productGrid.grid-product.list-view .product-card-actions {
+    align-self: flex-end;
+    flex: 0 0 auto;
+  }
+}
   .global-loading {
   position: fixed;
   inset: 0;
@@ -24,7 +182,7 @@
   width: 40px;
   height: 40px;
   border: 4px solid #eee;
-  border-top: 4px solid #1677ff;
+  border-top: 4px solid #ffe6e6;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 12px;
@@ -41,7 +199,6 @@
   overflow-y: auto;
   word-break: break-word;
 }
-
 </style>
 <div class="product-container">
 
@@ -189,30 +346,107 @@
     </div>
   </div>
 
-  <div style="display: flex; justify-content: space-between; align-items: center; margin: 10px 0;">
-    <label style="cursor: pointer; font-weight: 500;">
-      <input type="checkbox" id="select-all-visible" />
+  <div style="
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 16px 0 20px;
+    padding: 0 16px;
+    flex-wrap: wrap;
+    gap: 16px;
+    background-color: #fff;
+  ">
+    <!-- Chọn trang -->
+    <label style="
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: max-content;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-weight: 500;
+      color: #333;
+      font-size: 14px;
+      border-radius: 10px;
+      border: 1px solid #e0e0e0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    ">
+      <input type="checkbox" id="select-all-visible" style="accent-color: #c82333;" />
       Chọn trang
     </label>
 
-    <button 
-      id="btn-delete-selected" 
-      style="
+    <!-- View Toggle - Icon đẹp hơn bằng SVG -->
+    <div class="view-toggle" style="
+      display: flex;
+      gap: 16px;
+      background: #ffffff;
+      padding: 8px 16px;
+      border-radius: 10px;
+      border: 1px solid #e0e0e0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    ">
+      <button class="view-btn active" data-view="grid" title="Chế độ lưới" style="
         background: none;
         border: none;
-        color: #ffcccc;
-        cursor: pointer;
         padding: 0;
-        font-size: 14px;
-      "
-    >
+        cursor: pointer;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      ">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" fill="#ef4444"/>
+          <rect x="14" y="3" width="7" height="7" rx="1.5" fill="#ef4444"/>
+          <rect x="3" y="14" width="7" height="7" rx="1.5" fill="#ef4444"/>
+          <rect x="14" y="14" width="7" height="7" rx="1.5" fill="#ef4444"/>
+        </svg>
+      </button>
+
+      <button class="view-btn" data-view="list" title="Chế độ danh sách" style="
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      ">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="5" width="3" height="3" rx="1.5" fill="#ef4444"/>
+          <rect x="0" y="11" width="3" height="3" rx="1.5" fill="#ef4444"/>
+          <rect x="0" y="17" width="3" height="3" rx="1.5" fill="#ef4444"/>
+          <rect x="5" y="5" width="15" height="3" rx="1.5" fill="#ef4444"/>
+          <rect x="5" y="11" width="15" height="3" rx="1.5" fill="#ef4444"/>
+          <rect x="5" y="17" width="15" height="3" rx="1.5" fill="#ef4444"/>
+        </svg>
+      </button>
+    </div>  
+
+    <!-- Xóa sản phẩm -->
+    <button id="btn-delete-selected" style="
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+    ">
       Xóa sản phẩm đã chọn
     </button>
   </div>
 
   <!-- Danh sách -->
-  <div id="productGrid" class="product-grid"></div>
-  <div id="pagination" class="pagination"></div>
+  <div id="productGrid" class="grid-product"></div>
+  <div id="pagination" class="pagination-custom"></div>
 </div>
 
 <!-- Modal Edit -->
@@ -229,7 +463,7 @@
         <h4>Thông tin chung</h4>
         <div class="form-grid">
           <div>
-            <label for="edit-SKU">SKU</label>
+            <label for="edit-SKU">ID</label>
             <input type="text" id="edit-SKU" name="SKU" required class="ant-input" />
           </div>
 
@@ -329,6 +563,43 @@ let currentFilters = {};
 let currentPage = 1;
 const limit = 21;
 let selectedProductIds = [];
+
+// Toggle Grid / List view
+let currentView = 'grid';
+
+document.addEventListener('DOMContentLoaded', () => {
+  const toggleButtons = document.querySelectorAll('.view-btn');
+  
+  toggleButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      
+      // Update active button
+      toggleButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      // Update grid class
+      const grid = document.getElementById('productGrid');
+      if (view === 'list') {
+        grid.classList.add('list-view');
+        currentView = 'list';
+      } else {
+        grid.classList.remove('list-view');
+        currentView = 'grid';
+      }
+      
+      // Lưu lựa chọn (tùy chọn)
+      localStorage.setItem('productView', currentView);
+    });
+  });
+
+  // Khôi phục view từ localStorage
+  const savedView = localStorage.getItem('productView');
+  if (savedView === 'list') {
+    const listBtn = document.querySelector('.view-btn[data-view="list"]');
+    if (listBtn) listBtn.click();
+  }
+});
 
 function showLoading(text = "Đang xử lý...") {
   const el = document.getElementById("globalLoading");
@@ -745,34 +1016,35 @@ document.addEventListener("DOMContentLoaded", async () => {
       };
 
       card.innerHTML = `
-      <label style="position:absolute;top:8px;left:8px;z-index:2;">
-        <input
-          type="checkbox"
-          class="product-checkbox"
-          data-id="${p._id}"
-          ${selectedProductIds.includes(p._id) ? "checked" : ""}
-          onclick="event.stopPropagation()"
-        />
-      </label>
+        <label class="product-checkbox-wrapper">
+          <input
+            type="checkbox"
+            class="product-checkbox"
+            data-id="${p._id}"
+            ${selectedProductIds.includes(p._id) ? "checked" : ""}
+            onclick="event.stopPropagation()"
+          />
+        </label>
         <img
           loading="lazy"
           src="${p.coverImage || '/imgs/placeholder.jpg'}"
           onerror="this.src='/imgs/placeholder.jpg'"
         />
-        <h4>${p.name}</h4>
-        <p class="sku">SKU: ${p.groupId}</p>
-        <p class="price-display">${minPrice.toLocaleString()} VNĐ</p>
-        <div class="color-dots">
-          ${uniqueColors.slice(0, 4).map(c =>
-            `<div title="${c.name}" class="dot" style="background:${c.code || '#ddd'}"></div>`
-          ).join("")}
-          ${extra > 0 ? `<div class="dot more">+${extra}</div>` : ""}
+        <div class="info">
+          <h4>${p.name}</h4>
+          <p class="sku">ID: ${p.groupId}</p>
+          <p class="price-display">${minPrice.toLocaleString()} VNĐ</p>
+          <div class="color-dots">
+            ${uniqueColors.slice(0, 4).map(c => `<div title="${c.name}" class="dot" style="background:${c.code || '#ddd'}"></div>`).join("")}
+            ${extra > 0 ? `<div class="dot more">+${extra}</div>` : ""}
+          </div>
         </div>
         <div class="product-card-actions">
-          <button class="btn-edit">Sửa</button>
-          <button class="btn-delete">Xóa</button>
+            <button class="btn-edit">Sửa</button>
+            <button class="btn-delete">Xóa</button>
+          </div>
         </div>
-      `;
+      `;  
 
       card.querySelector(".btn-edit").onclick = e => {
         e.stopPropagation();
@@ -1159,13 +1431,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     const start = Math.max(1, currentPage - 2);
     const end = Math.min(totalPages, currentPage + 2);
 
-    if (start > 1) html += `<button onclick="loadProducts(currentFilters,1)">1</button>${start > 2 ? '...' : ''}`;
+    if (start > 1) {
+      html += `<button onclick="loadProducts(currentFilters,1)">1</button>`;
+      if (start > 2) html += '<span class="ellipsis">...</span>';
+    }
 
     for (let i = start; i <= end; i++) {
       html += `<button class="${i === currentPage ? 'active' : ''}" onclick="loadProducts(currentFilters,${i})">${i}</button>`;
     }
 
-    if (end < totalPages) html += `${end < totalPages - 1 ? '...' : ''}<button onclick="loadProducts(currentFilters,${totalPages})">${totalPages}</button>`;
+    if (end < totalPages) {
+      if (end < totalPages - 1) html += '<span class="ellipsis">...</span>';
+      html += `<button onclick="loadProducts(currentFilters,${totalPages})">${totalPages}</button>`;
+    }
 
     pagination.innerHTML = html;
   }

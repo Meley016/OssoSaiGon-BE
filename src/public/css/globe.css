@@ -252,14 +252,6 @@ textarea:focus {
   background: #dc2626;
 }
 
-/* ✅ PRODUCT GRID */
-.product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-  padding: 16px;
-}
-
 /* ✅ PRODUCT CARD */
 .product-card {
   background: #fff;
@@ -339,32 +331,6 @@ textarea:focus {
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
-}
-
-/* ✅ PAGINATION */
-.pagination {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.pagination button {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.pagination button.active {
-  background: #3498db;
-  color: white;
-  border-color: #3498db;
-}
-
-.pagination button:hover {
-  background: #f0f0f0;
 }
 
 /* ✅ FILTER GRID */
@@ -1068,12 +1034,6 @@ textarea:focus {
   gap: 8px;
 }
 
-.product-grid {
-  display: grid;
-  gap: 12px;
-  max-height: 450px;
-  overflow-y: auto;
-}
 
 .product-item {
   display: flex;
