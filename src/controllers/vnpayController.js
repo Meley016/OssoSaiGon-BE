@@ -168,7 +168,7 @@ function isVnpaySuccess(params = {}) {
   );
 }
 /* ======================= IPN ======================= */
-exports.vnpayIpn = async (req, res) => {
+exports.vnpayIPN = async (req, res) => {
   try {
     let vnpParams = { ...req.query };
     const secureHash = vnpParams.vnp_SecureHash;
