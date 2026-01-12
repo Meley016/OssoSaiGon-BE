@@ -168,117 +168,87 @@ function isVnpaySuccess(params = {}) {
   );
 }
 /* ======================= IPN ======================= */
-exports.vnpayIPN = async (req, res) => {
-  const params = req.query;
-  const clientIP = getClientIp(req);
-  let log;
-
+exports.vnpayIpn = async (req, res) => {
   try {
-    /* ================== 1. VERIFY CHECKSUM (BẮT BUỘC ĐẦU TIÊN) ================== */
-    const verify = vnpay.verifyIpnCall(params);
-    if (!verify.isSuccess) {
-      // LOG checksum fail (OK)
-      await IPNLog.create({
-        txnRef: params.vnp_TxnRef || 'unknown',
-        vnpParams: params,
-        clientIP,
-        status: 'error',
-        response: { RspCode: '97', Message: 'Invalid signature' },
-      });
+    let vnpParams = { ...req.query };
+    const secureHash = vnpParams.vnp_SecureHash;
 
-      return res.json({ RspCode: '97', Message: 'Invalid signature' });
+    delete vnpParams.vnp_SecureHash;
+    delete vnpParams.vnp_SecureHashType;
+
+    // 1️⃣ Sort params
+    vnpParams = Object.keys(vnpParams)
+      .sort()
+      .reduce((acc, key) => {
+        acc[key] = vnpParams[key];
+        return acc;
+      }, {});
+
+    // 2️⃣ Verify checksum
+    const signData = qs.stringify(vnpParams, { encode: false });
+    const hmac = crypto.createHmac("sha512", process.env.VNP_HASH_SECRET);
+    const signed = hmac.update(Buffer.from(signData, "utf-8")).digest("hex");
+
+    if (secureHash !== signed) {
+      return res.json({
+        RspCode: "97",
+        Message: "Invalid Checksum",
+      });
     }
 
-    /* ================== 2. VERIFY TMN ================== */
-    if (verify.vnp_TmnCode !== process.env.VNP_TMNCODE) {
-      await IPNLog.create({
-        txnRef: verify.vnp_TxnRef,
-        vnpParams: params,
-        clientIP,
-        status: 'error',
-        response: { RspCode: '97', Message: 'Invalid TMN code' },
-      });
+    const orderId = vnpParams.vnp_TxnRef;
+    const amount = Number(vnpParams.vnp_Amount) / 100;
+    const responseCode = vnpParams.vnp_ResponseCode;
 
-      return res.json({ RspCode: '97', Message: 'Invalid TMN code' });
-    }
+    // 3️⃣ Find order
+    const order = await Order.findOne({ orderCode: orderId });
 
-    /* ================== 3. LOG RAW IPN (LÚC NÀY MỚI LOG) ================== */
-    log = await IPNLog.create({
-      txnRef: verify.vnp_TxnRef,
-      vnpParams: params,
-      clientIP,
-      status: 'pending',
-      vnpResponseCode: verify.vnp_ResponseCode,
-      vnpTransactionStatus: verify.vnp_TransactionStatus,
-    });
-
-    /* ================== 4. FIND ORDER ================== */
-    const order = await Order.findOne({ vnpayTxnRef: verify.vnp_TxnRef });
     if (!order) {
-      log.status = 'error';
-      log.response = { RspCode: '01', Message: 'Order not found' };
-      await log.save();
-      return res.json(log.response);
+      return res.json({
+        RspCode: "01",
+        Message: "Order Not Found",
+      });
     }
 
-    /* ================== 5. CHECK AMOUNT ================== */
-    const vnpAmount = Number(verify.vnp_Amount);
-    const orderAmount = Math.round(order.total * 100);
-
-    if (vnpAmount !== orderAmount) {
-      log.status = 'error';
-      log.response = { RspCode: '04', Message: 'Invalid amount' };
-      await log.save();
-      return res.json(log.response);
+    // 4️⃣ Validate amount
+    if (order.totalPrice !== amount) {
+      return res.json({
+        RspCode: "04",
+        Message: "Invalid amount",
+      });
     }
 
-    /* ================== 6. DUPLICATE ================== */
-    if (order.status === 'paid') {
-      log.status = 'duplicate';
-      log.response = { RspCode: '02', Message: 'Already confirmed' };
-      await log.save();
-      return res.json(log.response);
+    // 5️⃣ Already confirmed
+    if (order.paymentStatus === "paid") {
+      return res.json({
+        RspCode: "02",
+        Message: "Order already confirmed",
+      });
     }
 
-    /* ================== 7. HANDLE RESULT ================== */
-    const isSuccess =
-      verify.vnp_ResponseCode === '00' &&
-      verify.vnp_TransactionStatus === '00';
-
-    if (isSuccess) {
-      order.status = 'paid';
+    // 6️⃣ Update order status
+    if (responseCode === "00") {
+      order.paymentStatus = "paid";
+      order.paymentMethod = "vnpay";
+      order.vnpTransactionNo = vnpParams.vnp_TransactionNo;
       order.paidAt = new Date();
-      order.vnpayTransactionNo = verify.vnp_TransactionNo;
-      order.vnpayResponseCode = verify.vnp_ResponseCode;
-      order.isTemporary = false;
-
-      await order.save();
-      await finalizeOrder(order);
-      log.status = 'success';
     } else {
-      order.status =
-        verify.vnp_ResponseCode === '24' ? 'cancelled' : 'failed';
-      order.vnpayResponseCode = verify.vnp_ResponseCode;
-
-      await order.save();
-      log.status = 'failed';
+      order.paymentStatus = "failed";
     }
 
-    /* ================== 8. CONFIRM TO VNPAY ================== */
-    log.response = { RspCode: '00', Message: 'Confirm Success' };
-    await log.save();
-    return res.json(log.response);
+    await order.save();
 
+    // 7️⃣ SUCCESS RESPONSE (IMPORTANT)
+    return res.json({
+      RspCode: "00",
+      Message: "Confirm Success",
+    });
   } catch (err) {
-    console.error('VNPay IPN ERROR:', err);
-
-    if (log) {
-      log.status = 'error';
-      log.response = { RspCode: '99', Message: 'System Error' };
-      await log.save();
-    }
-
-    return res.json({ RspCode: '99', Message: 'System Error' });
+    console.error("VNPay IPN Error:", err);
+    return res.json({
+      RspCode: "99",
+      Message: "System Error",
+    });
   }
 };
 
