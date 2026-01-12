@@ -199,6 +199,76 @@
   overflow-y: auto;
   word-break: break-word;
 }
+.pagination-custom {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+
+  margin: 32px 0;
+  flex-wrap: wrap;
+}
+
+/* Button */
+.pagination-custom button {
+  min-width: 42px;
+  height: 48px;
+  padding: 0 14px;
+  margin-top: 20px;
+  border: none;
+  border-radius: 6px;
+
+  background: #ffe6e6;      
+  color: #111;          
+
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.25s ease;
+}
+
+/* Hover */
+.pagination-custom button:hover {
+  background: #111;   
+  color: #fff;             
+  transform: translateY(-2px);
+}
+
+/* Active */
+.pagination-custom button.active {
+  background: #000000;      
+  color: #fff;
+  font-weight: 600;
+  cursor: default;
+  transform: none;
+}
+
+
+/* Ellipsis (...) */
+.pagination-custom .ellipsis {
+  padding: 0 6px;
+  font-size: 16px;
+  color: #888;
+  user-select: none;
+}
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 480px) {
+  .pagination-custom {
+    gap: 6px;
+  }
+
+  .pagination-custom button {
+    min-width: 36px;
+    height: 36px;
+    font-size: 13px;
+    border-radius: 10px;
+    padding: 0 10px;
+  }
+}
 </style>
 <div class="product-container">
 
