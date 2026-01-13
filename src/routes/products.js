@@ -22,7 +22,12 @@ router.post(
   uploadCSV.single("csvFile"),
   productController.importProducts
 );
-
+router.delete(
+  "/:id",
+  protect,
+  requireRole("productAdder", "admin"),
+  productController.deleteProduct
+);
 // ===== FILTER / QUERY =====
 router.get("/facets", productController.getProductFacets);
 router.get("/advanced", productController.getAllProductsAdvanced);

@@ -2,6 +2,24 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
 <link rel="stylesheet" href="/css/globe.css">
 <style>
+  .price-display {
+  margin: 8px 0;
+  min-height: 24px;
+  line-height: 1.4;
+}
+
+.sale-price {
+  font-weight: 700;
+}
+
+.original-price {
+  opacity: 0.75;
+}
+
+.product-card:hover .sale-price {
+  transform: scale(1.05);
+  transition: transform 0.2s;
+}
  #productGrid.grid-product {
   display: grid !important;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
@@ -301,6 +319,7 @@
               <th>Size</th>
               <th>Số lượng</th>
               <th>Giá</th>
+              <th>Giá KM</th>
               <th>Ảnh</th>
               <th>Hành động</th>
             </tr>
@@ -570,6 +589,7 @@
               <th>Size</th>
               <th>Tồn kho</th>
               <th>Giá</th>
+              <th>Giá KM</th>
               <th>Ảnh</th>
             </tr>
           </thead>
@@ -734,6 +754,13 @@ function addVariantRow(body, variant = {}, isEdit = false) {
 
     <td data-label="Giá">
       <input type="number" name="variantPrice[]" value="${variant.price || 0}" min="1" step="1" class="ant-input" required>
+    </td>
+
+    <td data-label="Giá KM">                                <!-- ← THÊM -->
+      <input type="number" name="variantSalePrice[]" 
+             value="${variant.salePrice || ''}" 
+             min="0" placeholder="Để trống = không KM" 
+             class="ant-input">
     </td>
 
     <td data-label="Ảnh" style="position:relative;">
@@ -931,9 +958,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         const size = row.querySelector("select[name='variantSize[]']").value;
         const stock = row.querySelector("input[name='variantStock[]']").value;
         const price = row.querySelector("input[name='variantPrice[]']").value;
+        const salePrice = row.querySelector("input[name='variantSalePrice[]']").value;
 
         if (color && size && price > 0) {
-          variants.push({ color, size, stock: Number(stock), price: Number(price) });
+          variants.push({ color, size, stock: Number(stock), price: Number(price), salePrice: salePrice ? Number(salePrice) : null });
 
           // 🟢 Chỉ upload ảnh 1 lần cho mỗi colorId
           if (!uploadedColors.has(color)) {
@@ -1025,123 +1053,166 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // === LOAD PRODUCTS ===
   window.loadProducts = async (filters = {}, page = 1) => {
-  currentPage = page;
+    currentPage = page;
 
-  const params = new URLSearchParams({ ...filters, page, limit });
-  const grid = document.getElementById("productGrid");
-
-  /* =====================
-     SHOW SKELETON
-  ===================== */
-  grid.innerHTML = Array.from({ length: limit }).map(() => `
-    <div class="product-card skeleton">
-      <div class="img"></div>
-      <div class="line"></div>
-      <div class="line short"></div>
-    </div>
-  `).join("");
-
-  try {
-    const res = await fetch(`/api/products?${params}`);
-    if (!res.ok) throw new Error("Lỗi tải sản phẩm");
-
-    const data = await res.json();
-    const products = Array.isArray(data.data) ? data.data : [];
-
-    grid.innerHTML = "";
-
-    if (!products.length) {
-      grid.innerHTML = '<p style="text-align:center;padding:20px;">Chưa có sản phẩm nào.</p>';
-      return;
-    }
+    const params = new URLSearchParams({ ...filters, page, limit });
+    const grid = document.getElementById("productGrid");
 
     /* =====================
-       RENDER TỪNG PRODUCT
+      SHOW SKELETON
     ===================== */
-    for (const p of products) {
-      const variants = Array.isArray(p.variants) ? p.variants : [];
-      const safeVariants = variants.filter(
-        v => v && v.color && v.color._id && typeof v.price === "number"
-      );
+    grid.innerHTML = Array.from({ length: limit }).map(() => `
+      <div class="product-card skeleton">
+        <div class="img"></div>
+        <div class="line"></div>
+        <div class="line short"></div>
+      </div>
+    `).join("");
 
-      const prices = safeVariants.map(v => v.price);
-      const minPrice = prices.length ? Math.min(...prices) : 0;
+    try {
+      const res = await fetch(`/api/products?${params}`);
+      if (!res.ok) throw new Error("Lỗi tải sản phẩm");
 
-      const uniqueColors = [
-        ...new Map(
-          safeVariants
-            .filter(v => v.color && v.color._id)
-            .map(v => [v.color._id, v.color])
-        ).values()
-      ];
+      const data = await res.json();
+      const products = Array.isArray(data.data) ? data.data : [];
 
-      const colorCount = uniqueColors.length;
-      const extra = colorCount > 4 ? colorCount - 4 : 0;
+      grid.innerHTML = "";
 
-      const card = document.createElement("div");
-      card.className = "product-card";
-      card.onclick = () => {
-        if (document.querySelector(".product-checkbox:checked")) return;
-        showProductDetail(p._id);
-      };
+      if (!products.length) {
+        grid.innerHTML = '<p style="text-align:center;padding:20px;">Chưa có sản phẩm nào.</p>';
+        return;
+      }
 
-      card.innerHTML = `
-        <label class="product-checkbox-wrapper">
-          <input
-            type="checkbox"
-            class="product-checkbox"
-            data-id="${p._id}"
-            ${selectedProductIds.includes(p._id) ? "checked" : ""}
-            onclick="event.stopPropagation()"
+      /* =====================
+        RENDER TỪNG PRODUCT
+      ===================== */
+      for (const p of products) {
+        const variants = Array.isArray(p.variants) ? p.variants : [];
+        const safeVariants = variants.filter(
+          v => v && v.color && v.color._id && typeof v.price === "number"
+        );
+
+        if (!safeVariants.length) {
+          // Trường hợp hiếm: sản phẩm không có variant hợp lệ
+          const card = document.createElement("div");
+          card.className = "product-card";
+          card.innerHTML = `<p style="text-align:center;padding:20px;">Sản phẩm không có biến thể hợp lệ</p>`;
+          grid.appendChild(card);
+          continue;
+        }
+
+        // === Tính toán giá ===
+        const allPrices = safeVariants.map(v => v.price);
+        const allSalePrices = safeVariants.map(v => v.salePrice ?? v.price); // salePrice nếu có, không thì dùng price
+
+        const minOriginalPrice = Math.min(...allPrices);
+        const minDisplayPrice = Math.min(...allSalePrices);
+
+        const hasPromotion = safeVariants.some(v => 
+          v.salePrice != null && v.salePrice > 0 && v.salePrice < v.price
+        );
+
+        // === Format hiển thị giá ===
+        let priceHTML = '';
+
+        if (hasPromotion) {
+          priceHTML = `
+            <span class="sale-price" style="color:#ef4444; font-weight:bold; font-size:1.1em;">
+              ${minDisplayPrice.toLocaleString('vi-VN')}đ
+            </span>
+            <del class="original-price" style="color:#888; font-size:0.92em; margin-left:8px;">
+              ${minOriginalPrice.toLocaleString('vi-VN')}đ
+            </del>
+          `;
+        } else {
+          priceHTML = `
+            <span style="color:#222; font-weight:600; font-size:1.05em;">
+              ${minDisplayPrice.toLocaleString('vi-VN')}đ
+            </span>
+          `;
+        }
+
+        // === Tính màu sắc độc nhất ===
+        const uniqueColors = [
+          ...new Map(
+            safeVariants
+              .filter(v => v.color && v.color._id)
+              .map(v => [v.color._id, v.color])
+          ).values()
+        ];
+
+        const colorCount = uniqueColors.length;
+        const extra = colorCount > 4 ? colorCount - 4 : 0;
+
+        // === Tạo card ===
+        const card = document.createElement("div");
+        card.className = "product-card";
+        card.onclick = () => {
+          if (document.querySelector(".product-checkbox:checked")) return;
+          showProductDetail(p._id);
+        };
+
+        card.innerHTML = `
+          <label class="product-checkbox-wrapper">
+            <input
+              type="checkbox"
+              class="product-checkbox"
+              data-id="${p._id}"
+              ${selectedProductIds.includes(p._id) ? "checked" : ""}
+              onclick="event.stopPropagation()"
+            />
+          </label>
+          <img
+            loading="lazy"
+            src="${p.coverImage || '/imgs/placeholder.jpg'}"
+            onerror="this.src='/imgs/placeholder.jpg'"
           />
-        </label>
-        <img
-          loading="lazy"
-          src="${p.coverImage || '/imgs/placeholder.jpg'}"
-          onerror="this.src='/imgs/placeholder.jpg'"
-        />
-        <div class="info">
-          <h4>${p.name}</h4>
-          <p class="sku">ID: ${p.groupId}</p>
-          <p class="price-display">${minPrice.toLocaleString()} VNĐ</p>
-          <div class="color-dots">
-            ${uniqueColors.slice(0, 4).map(c => `<div title="${c.name}" class="dot" style="background:${c.code || '#ddd'}"></div>`).join("")}
-            ${extra > 0 ? `<div class="dot more">+${extra}</div>` : ""}
+          <div class="info">
+            <h4>${p.name}</h4>
+            <p class="sku">ID: ${p.groupId}</p>
+            <p class="price-display">
+              ${priceHTML}
+            </p>
+            <div class="color-dots">
+              ${uniqueColors.slice(0, 4).map(c => `
+                <div title="${c.name}" class="dot" style="background:${c.code || '#ddd'}"></div>
+              `).join("")}
+              ${extra > 0 ? `<div class="dot more">+${extra}</div>` : ""}
+            </div>
           </div>
-        </div>
-        <div class="product-card-actions">
+          <div class="product-card-actions">
             <button class="btn-edit">Sửa</button>
             <button class="btn-delete">Xóa</button>
           </div>
-        </div>
-      `;  
+        `;
 
-      card.querySelector(".btn-edit").onclick = e => {
-        e.stopPropagation();
-        editProduct(p._id);
-      };
+        card.querySelector(".btn-edit").onclick = e => {
+          e.stopPropagation();
+          editProduct(p._id);
+        };
 
-      card.querySelector(".btn-delete").onclick = e => {
-        e.stopPropagation();
-        deleteProduct(p._id);
-      };
+        card.querySelector(".btn-delete").onclick = e => {
+          e.stopPropagation();
+          deleteProduct(p._id);
+        };
 
-      grid.appendChild(card);
-    }
+        grid.appendChild(card);
+      }
+
       const selectAll = document.getElementById("select-all-visible");
       if (selectAll) selectAll.checked = false;
-    /* =====================
-       PAGINATION
-    ===================== */
-    const totalPages = data.pagination?.totalPages || 1;
-    renderPagination(page, totalPages);
 
-  } catch (err) {
-    console.error(err);
-    grid.innerHTML = '<p style="text-align:center;padding:20px;">Lỗi tải sản phẩm!</p>';
-  }
-};
+      /* =====================
+        PAGINATION
+      ===================== */
+      const totalPages = data.totalPages || data.pagination?.totalPages || 1;
+      renderPagination(page, totalPages);
 
+    } catch (err) {
+      console.error("Lỗi load products:", err);
+      grid.innerHTML = '<p style="text-align:center;padding:20px;color:#e74c3c;">Lỗi tải danh sách sản phẩm!</p>';
+    }
+  };
   document.addEventListener("change", e => {
     if (!e.target.classList.contains("product-checkbox")) return;
 
@@ -1282,7 +1353,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 required
               >
             </td>
-
+            <td> 
+              <input type="number" name="salePrice[]" value="${v.salePrice || ''}" min="0" placeholder="Để trống = không KM" class="ant-input">
+            </td>
             ${
               index === 0
                 ? `
@@ -1391,7 +1464,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       row.querySelector("input[name='price[]'], input[name='variantPrice[]']")
         ?.value || 0
     );
-
+    const salePrice = Number(
+        row.querySelector("input[name='salePrice[]'], input[name='variantSalePrice[]']")?.value || 0
+      ) || null;
     if (!colorId || !sizeId || price <= 0) return;
 
     variants.push({
@@ -1399,7 +1474,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       color: colorId,
       size: sizeId,
       stockQuantity: stock,
-      price
+      price,
+      salePrice: salePrice && salePrice > 0 ? salePrice : null
     });
 
     // 🔥 upload ảnh MỖI COLOR 1 LẦN

@@ -105,31 +105,6 @@ const splitFiles = (files) => {
   console.log("🧩 Parsed variantImages (colorId keys):", Object.keys(variantImages));
   return { variantImages };
 };
-function groupByColor(variants) {
-  return variants.reduce((acc, v) => {
-    const cid = v.color.toString();
-    if (!acc[cid]) acc[cid] = [];
-    acc[cid].push(v);
-    return acc;
-  }, {});
-}
-const fileToUrl = (file) => {
-  const url = file?.path || null;
-  console.log("File to URL:", file?.originalname, "->", url);
-  return url;
-};
-const deleteCloudinaryImages = async (urls = []) => {
-  for (const url of urls) {
-    const publicId = extractPublicId(url);
-    if (publicId) {
-      try {
-        await cloudinary.uploader.destroy(publicId);
-      } catch (err) {
-        console.warn("❌ Delete ảnh lỗi:", publicId);
-      }
-    }
-  }
-};
 
 const extractPublicId = (url) => {
   if (!url) return null;
@@ -497,7 +472,9 @@ exports.getProductsByBrand = async (req, res) => {
       status: "active",
     };
 
-    if (brand) matchProduct.brand = brand;
+    if (brand) {
+      matchProduct.brand = new RegExp(`^${brand.trim()}$`, "i");
+    }
     if (category) matchProduct.category = new mongoose.Types.ObjectId(category);
 
     if (name) {
@@ -937,6 +914,7 @@ exports.createProduct = async (req, res) => {
         color: v.color,
         size: v.size,
         price: Number(v.price),
+        salePrice: v.salePrice ? Number(v.salePrice) : null,
         stockQuantity: Number(v.stock),
         importPrice: Number(v.importPrice || v.price * 0.8),
         images: sharedImages,
@@ -1114,6 +1092,7 @@ exports.importProducts = async (req, res) => {
             color: color._id,
             size: size._id,
             price: v.price,
+            salePrice: Number(r["Sale Price"] || 0) || null,
             stockQuantity: v.quantity,
             importPrice: Math.round(v.price * 0.8),
             images: sharedImages,
@@ -1269,6 +1248,7 @@ exports.exportProducts = async (req, res) => {
           "Size name": v.size?.name || "",
           "Size code": v.size?.code || "",
           Price: v.price,
+          "Sale Price": v.salePrice || "",
           Quantity: v.stockQuantity,
           "Sub Images": (v.images || []).join(",")
         });
@@ -1419,7 +1399,7 @@ exports.updateProduct = async (req, res) => {
     const keepVariantIds = new Set();
 
     for (const v of variants) {
-      const { _id, color, size, stockQuantity, price } = v;
+      const { _id, color, size, stockQuantity, price, salePrice } = v;
       if (!color || !size || price <= 0) continue;
 
       if (_id) {
@@ -1427,8 +1407,19 @@ exports.updateProduct = async (req, res) => {
         const existing = product.variants.id(_id);
         if (!existing) continue;
 
+        const finalSalePrice = salePrice && !isNaN(Number(salePrice)) && Number(salePrice) > 0 
+        ? Number(salePrice) 
+        : null;
+
+      // Validate: salePrice không được > price
+      if (finalSalePrice !== null && finalSalePrice > Number(price)) {
+        return res.status(400).json({ 
+          error: `salePrice (${finalSalePrice}) phải nhỏ hơn hoặc bằng price (${price}) cho biến thể ${_id || "mới"}` 
+        });
+      }
         existing.stockQuantity = stockQuantity;
         existing.price = price;
+        existing.salePrice = finalSalePrice;
         keepVariantIds.add(existing._id.toString());
       } else {
         // ADD VARIANT MỚI
@@ -1438,6 +1429,7 @@ exports.updateProduct = async (req, res) => {
           size,
           stockQuantity,
           price,
+          salePrice: finalSalePrice,
           importPrice: Math.round(price * 0.8),
           images: [],
           coverImage: null

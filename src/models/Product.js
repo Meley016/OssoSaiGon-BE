@@ -7,6 +7,17 @@ const variantSchema = new mongoose.Schema(
     size: { type: mongoose.Schema.Types.ObjectId, ref: "Size", required: true },
     stockQuantity: { type: Number, required: true, min: 0 },
     price: { type: Number, required: true, min: 0 },
+    salePrice: {                                                
+      type: Number,
+      min: 0,
+      default: null,// null = không khuyến mãi
+      validate: {
+        validator: function (val) {
+          return val === null || val <= this.price;
+        },
+        message: "salePrice phải nhỏ hơn hoặc bằng price",
+      },
+    },
     importPrice: { type: Number, required: true, min: 0 },
     images: [{ type: String }],
     coverImage: { type: String }
