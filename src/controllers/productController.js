@@ -1000,6 +1000,11 @@ exports.importProducts = async (req, res) => {
         sizeName: (r["Size name"] || "").trim(),
         sizeCode: (r["Size code"] || "").trim(),
         price: Number(r.Price || 0),
+        salePrice:
+          r["Sale Price"] !== undefined && r["Sale Price"] !== ""
+            ? Number(r["Sale Price"])
+            : null,
+
         quantity: Number(r.Quantity || 0),
         subImages: (r["Sub Images"] || "")
           .split(",")
@@ -1092,7 +1097,7 @@ exports.importProducts = async (req, res) => {
             color: color._id,
             size: size._id,
             price: v.price,
-            salePrice: Number(r["Sale Price"] || 0) || null,
+            salePrice: v.salePrice,
             stockQuantity: v.quantity,
             importPrice: Math.round(v.price * 0.8),
             images: sharedImages,
