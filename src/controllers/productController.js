@@ -467,144 +467,95 @@ exports.getProductsByBrand = async (req, res) => {
     limit = Number(limit);
     const skip = (page - 1) * limit;
 
-    /* ================= MATCH PRODUCT ================= */
-    const matchProduct = {
+    /* ================= BASE QUERY ================= */
+    const query = {
       status: "active",
     };
 
     if (brand) {
-      matchProduct.brand = new RegExp(`^${brand.trim()}$`, "i");
+      query.brand = new RegExp(`^${brand.trim()}$`, "i");
     }
-    if (category) matchProduct.category = new mongoose.Types.ObjectId(category);
+
+    if (category) {
+      query.category = category;
+    }
 
     if (name) {
-      matchProduct.$text = { $search: name };
+      query.$text = { $search: name };
     }
 
-    /* ================= MATCH VARIANT ================= */
-    const matchVariant = {};
+    /* ================= VARIANT FILTER ================= */
+    const variantFilter = {};
 
     if (color) {
-      matchVariant["variants.color"] = new mongoose.Types.ObjectId(color);
+      variantFilter.color = color;
     }
 
     if (inStock === "true") {
-      matchVariant["variants.stockQuantity"] = { $gt: 0 };
+      variantFilter.stockQuantity = { $gt: 0 };
     }
 
     /* ================= SORT ================= */
-    let sortStage = { createdAt: -1 };
+    let sortOption = { createdAt: -1 };
 
-    if (sort === "name_asc") sortStage = { name: 1 };
-    if (sort === "name_desc") sortStage = { name: -1 };
+    if (sort === "name_asc") sortOption = { name: 1 };
+    if (sort === "name_desc") sortOption = { name: -1 };
 
-    /* ================= AGGREGATION ================= */
-    const pipeline = [
-      { $match: matchProduct },
+    /* ================= QUERY ================= */
+    const total = await Product.countDocuments(query);
 
-      // tách variant
-      { $unwind: "$variants" },
+    const products = await Product.find(query)
+      .populate("category", "name")
+      .populate("variants.color", "name code")
+      .populate("variants.size", "name code")
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-      // lọc variant
-      { $match: matchVariant },
+    /* ================= FORMAT (GIỐNG CATEGORY) ================= */
+    const formatted = products
+      .map((p) => {
+        let variants = p.variants || [];
 
-      // lookup color
-      {
-        $lookup: {
-          from: "colors",
-          localField: "variants.color",
-          foreignField: "_id",
-          as: "variants.color",
-        },
-      },
-      { $unwind: { path: "$variants.color", preserveNullAndEmptyArrays: true } },
+        // lọc variant theo điều kiện
+        variants = variants.filter((v) => {
+          if (!v || typeof v.price !== "number") return false;
+          if (color && String(v.color?._id) !== String(color)) return false;
+          if (inStock === "true" && v.stockQuantity <= 0) return false;
+          return true;
+        });
 
-      // lookup size
-      {
-        $lookup: {
-          from: "sizes",
-          localField: "variants.size",
-          foreignField: "_id",
-          as: "variants.size",
-        },
-      },
-      { $unwind: { path: "$variants.size", preserveNullAndEmptyArrays: true } },
+        if (variants.length === 0) return null;
 
-      // group lại product
-      {
-        $group: {
-          _id: "$_id",
-          name: { $first: "$name" },
-          brand: { $first: "$brand" },
-          category: { $first: "$category" },
-          createdAt: { $first: "$createdAt" },
-
-          variants: {
-            $push: {
-              sku: "$variants.sku",
-              price: "$variants.price",
-              stockQuantity: "$variants.stockQuantity",
-              color: "$variants.color",
-              size: "$variants.size",
-              images: "$variants.images",
-              coverImage: "$variants.coverImage",
-            },
-          },
-
-          minPrice: { $min: "$variants.price" },
-        },
-      },
-      {
-        $addFields: {
-          coverImage: {
-            $ifNull: [
-              { $arrayElemAt: ["$variants.coverImage", 0] },
-              { $arrayElemAt: ["$variants.images", 0] },
-            ],
-          },
-        },
-      },
-
-      // sort theo name
-      { $sort: sortStage },
-
-      // sort theo price (SAU group)
-      ...(sort === "price_asc"
-        ? [{ $sort: { minPrice: 1 } }]
-        : []),
-      ...(sort === "price_desc"
-        ? [{ $sort: { minPrice: -1 } }]
-        : []),
-
-      // paginate + total
-      {
-        $facet: {
-          data: [
-            { $skip: skip },
-            { $limit: limit },
-          ],
-          total: [{ $count: "count" }],
-        },
-      },
-    ];
-
-    const result = await Product.aggregate(pipeline);
-
-    const data = result[0]?.data || [];
-    const total = result[0]?.total[0]?.count || 0;
+        return {
+          _id: p._id,
+          name: p.name,
+          brand: p.brand,
+          category: p.category,
+          variants, // ✅ GIỮ NGUYÊN salePrice
+          coverImage:
+            p.coverImage ||
+            variants[0]?.coverImage ||
+            variants[0]?.images?.[0] ||
+            "/imgs/placeholder.jpg",
+        };
+      })
+      .filter(Boolean);
 
     res.json({
       success: true,
-      data,
+      data: formatted,
       total,
       page,
       totalPages: Math.ceil(total / limit),
     });
   } catch (err) {
-    console.error("GET PRODUCTS BY BRAND AGG ERROR:", err);
+    console.error("GET PRODUCTS BY BRAND ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 exports.getCategoriesByBrand = async (req, res) => {
   try {
