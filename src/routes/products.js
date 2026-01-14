@@ -38,6 +38,7 @@ router.get("/colors-by-brand-category", productController.getColorsByBrandCatego
 router.get("/brands", productController.getAllBrands);
 router.get("/filter", productController.filterProducts);
 router.get("/search", productController.searchProducts);
+router.get("/group/:groupId", productController.getProductByGroupId);
 
 // ===== BASE =====
 router.get("/", productController.getAllProducts);
