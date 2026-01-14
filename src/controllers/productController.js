@@ -1125,6 +1125,7 @@ exports.importProducts = async (req, res) => {
             const exist = product.variants.find((ex) => ex.sku === v.sku);
             if (exist) {
               exist.price = v.price;
+              exist.salePrice = v.salePrice;
               exist.stockQuantity = v.stockQuantity;
               exist.importPrice = v.importPrice;
               exist.color = v.color;
