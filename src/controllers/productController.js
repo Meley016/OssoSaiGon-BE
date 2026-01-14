@@ -249,10 +249,11 @@ exports.getAllProductsAdvanced = async (req, res) => {
       {
         $group: {
           _id: "$_id",
+          groupId: { $first: "$groupId" },
           name: { $first: "$name" },
           brand: { $first: "$brand" },
           category: { $first: "$category" },
-          createdAt: { $first: "$createdAt" },
+
           variants: { $push: "$variants" },
           minPrice: { $min: "$variants.price" },
         },
@@ -276,7 +277,6 @@ exports.getAllProductsAdvanced = async (req, res) => {
     const products = result[0]?.data || [];
     const total = result[0]?.total[0]?.count || 0;
 
-    /* ================= 🔥 FORMAT GIỐNG API CŨ 🔥 ================= */
     const formatted = products.map(p => {
       const validVariants = (p.variants || []).filter(v =>
         v &&
@@ -287,6 +287,7 @@ exports.getAllProductsAdvanced = async (req, res) => {
 
       return {
         _id: p._id,
+        groupId: p.groupId,
         name: p.name,
         brand: p.brand,
         category: p.category,
@@ -702,6 +703,31 @@ exports.getProductById = async (req, res) => {
     res.json(p);
   } catch (err) {
     res.status(500).json({ error: "Lỗi", details: err.message });
+  }
+};
+// === GET BY GROUP ID ===
+exports.getProductByGroupId = async (req, res) => {
+  try {
+    const product = await Product.findOne({
+      groupId: req.params.groupId,
+      status: "active",
+    })
+      .populate("category", "name")
+      .populate("variants.color", "name code")
+      .populate("variants.size", "name code")
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
+    }
+
+    product.coverImage =
+      product.variants?.[0]?.coverImage || "/imgs/placeholder.jpg";
+
+    res.json(product);
+  } catch (err) {
+    console.error("GET PRODUCT BY GROUP ID ERROR:", err);
+    res.status(500).json({ error: "Lỗi server", details: err.message });
   }
 };
 
