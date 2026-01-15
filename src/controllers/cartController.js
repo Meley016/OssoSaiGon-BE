@@ -30,24 +30,56 @@ exports.getCart = async (req, res) => {
   }
 };
 exports.addToCart = async (req, res) => {
-  const { productId, sku, quantity, price, variantInfo } = req.body;
+  const { productId, sku, quantity, variantInfo } = req.body;
 
-  let cart = await Cart.findOne({ userId: req.user._id });
-  if (!cart) cart = await Cart.create({ userId: req.user._id, items: [] });
+  try {
+    // 🔎 Tìm product + variant thật từ DB
+    const product = await Product.findOne({ "variants.sku": sku });
+    if (!product) return res.status(404).json({ error: "Product not found" });
 
-  const existingItem = cart.items.find(i => i.sku === sku);
+    const variant = product.variants.find(v => v.sku === sku);
+    if (!variant) return res.status(404).json({ error: "Variant not found" });
 
-  if (existingItem) {
-    existingItem.quantity += quantity;
-  } else {
-    cart.items.push({ productId, sku, quantity, price, variantInfo });
+    if (variant.stockQuantity < quantity) {
+      return res.status(400).json({ error: "Không đủ hàng tồn kho" });
+    }
+
+    // ✅ GIÁ CHUẨN ĐỂ LƯU VÀO CART
+    const finalPrice =
+      typeof variant.salePrice === "number" &&
+      variant.salePrice < variant.price
+        ? variant.salePrice
+        : variant.price;
+
+    let cart = await Cart.findOne({ userId: req.user._id });
+    if (!cart) cart = await Cart.create({ userId: req.user._id, items: [] });
+
+    const existingItem = cart.items.find(i => i.sku === sku);
+
+    if (existingItem) {
+      existingItem.quantity += quantity;
+    } else {
+      cart.items.push({
+        productId: product._id,
+        sku,
+        quantity,
+        price: finalPrice, // 🔥 SALE PRICE ĐƯỢC LƯU Ở ĐÂY
+        variantInfo: {
+          color: variant.color,
+          size: variant.size,
+          coverImage: variant.coverImage || variant.images?.[0],
+        },
+      });
+    }
+
+    cart.updatedAt = Date.now();
+    await cart.save();
+
+    await exports.getCart(req, res);
+  } catch (err) {
+    console.error("Add to cart error:", err);
+    res.status(500).json({ error: "Lỗi server" });
   }
-
-  cart.updatedAt = Date.now();
-  await cart.save();
-
-  res.json({ message: "Added!", cart });
-  await exports.getCart(req, res);
 };
 
 exports.updateCartItem = async (req, res) => {
@@ -89,7 +121,12 @@ exports.updateCartItem = async (req, res) => {
           productId: product._id,
           sku: newSku,
           quantity,
-          price: newVariant.price,
+          price:
+            typeof newVariant.salePrice === "number" &&
+            newVariant.salePrice < newVariant.price
+              ? newVariant.salePrice
+              : newVariant.price,
+
           variantInfo: {
             color: newVariant.color,
             size: newVariant.size,
