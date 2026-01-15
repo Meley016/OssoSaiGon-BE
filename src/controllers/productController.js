@@ -165,13 +165,14 @@ exports.getAllProducts = async (req, res) => {
         "/imgs/placeholder.jpg";
 
       return {
-        groupId: p.groupId,          // ✅ PUBLIC ID
+        _id: p._id,
+        groupId: p.groupId,          
         name: p.name,
         brand: p.brand,
         category: p.category,
         variants: p.variants,
         coverImage,
-        createdAt: p.createdAt,      // giữ cho FE sort
+        createdAt: p.createdAt,      
       };
     });
 
@@ -547,7 +548,8 @@ exports.getProductsByBrand = async (req, res) => {
         if (!variants.length) return null;
 
         return {
-          groupId: p.groupId, // ✅ FE chỉ dùng field này
+          _id: p._id,
+          groupId: p.groupId,  
           name: p.name,
           brand: p.brand,
           category: p.category,
