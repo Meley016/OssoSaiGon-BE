@@ -717,7 +717,7 @@ exports.getProductByGroupId = async (req, res) => {
       .populate("variants.size", "name code")
       .lean();
 
-    if (!product) {
+    if (!product) { 
       return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
     }
 
