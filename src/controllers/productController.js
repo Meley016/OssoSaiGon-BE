@@ -131,7 +131,7 @@ exports.getAllProducts = async (req, res) => {
       query.category = req.query.category; // ObjectId string
     }
 
-    // === Filter theo Brand (chính xác) ===
+    // === Filter theo Brand (chính xác, không chứa 1 phần) ===
     if (req.query.brand) {
       query.brand = new RegExp(`^${req.query.brand}$`, "i");
     }
@@ -143,7 +143,7 @@ exports.getAllProducts = async (req, res) => {
       };
     }
 
-    // === Debug (có thể xoá sau) ===
+    // === Debug Query (có thể xoá sau) ===
     console.log("QUERY:", query);
 
     const total = await Product.countDocuments(query);
@@ -157,28 +157,14 @@ exports.getAllProducts = async (req, res) => {
       .limit(limit)
       .lean();
 
-    /* ================= FORMAT OUTPUT (QUAN TRỌNG) ================= */
-    const formatted = products.map((p) => {
-      const coverImage =
-        p.variants?.[0]?.coverImage ||
-        p.images?.[0] ||
-        "/imgs/placeholder.jpg";
-
-      return {
-        _id: p._id,
-        groupId: p.groupId,          
-        name: p.name,
-        brand: p.brand,
-        category: p.category,
-        variants: p.variants,
-        coverImage,
-        createdAt: p.createdAt,      
-      };
+    // === Add coverImage fallback ===
+    products.forEach((p) => {
+      p.coverImage = p.variants?.[0]?.coverImage || p.images?.[0] || "/imgs/placeholder.jpg";
     });
 
     res.json({
       success: true,
-      data: formatted,
+      data: products,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(total / limit),
@@ -187,13 +173,9 @@ exports.getAllProducts = async (req, res) => {
     });
   } catch (err) {
     console.error("GET ALL PRODUCTS ERROR:", err);
-    res.status(500).json({
-      error: "Lỗi tải sản phẩm",
-      details: err.message,
-    });
+    res.status(500).json({ error: "Lỗi tải sản phẩm", details: err.message });
   }
 };
-
 exports.getAllProductsAdvanced = async (req, res) => {
   try {
     const page = Number(req.query.page) || 1;
@@ -263,20 +245,7 @@ exports.getAllProductsAdvanced = async (req, res) => {
         },
       },
       { $unwind: { path: "$variants.size", preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: "categories",
-          localField: "category",
-          foreignField: "_id",
-          as: "category",
-        },
-      },
-      {
-        $unwind: {
-          path: "$category",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
+
       {
         $group: {
           _id: "$_id",
@@ -284,7 +253,7 @@ exports.getAllProductsAdvanced = async (req, res) => {
           name: { $first: "$name" },
           brand: { $first: "$brand" },
           category: { $first: "$category" },
-
+          createdAt: { $first: "$createdAt" },
           variants: { $push: "$variants" },
           minPrice: { $min: "$variants.price" },
         },
@@ -347,7 +316,7 @@ exports.getAllProductsAdvanced = async (req, res) => {
 exports.getAllBrands = async (req, res) => {
   try {
     const brands = await Product.distinct("brand", {
-      brand: { $nin: [null, ""] },
+      brand: { $ne: null, $ne: "" },
       status: "active",
     });
 
@@ -459,7 +428,6 @@ exports.getProductsByCategories = async (req, res) => {
 
       return {
         _id: p._id,
-        groupId: p.groupId,
         name: p.name,
         coverImage:
           p.coverImage ||
@@ -503,7 +471,6 @@ exports.getProductsByBrand = async (req, res) => {
     /* ================= BASE QUERY ================= */
     const query = {
       status: "active",
-      groupId: { $exists: true, $ne: "" }, // 🔥 ÉP BẮT BUỘC groupId
     };
 
     if (brand) {
@@ -518,10 +485,25 @@ exports.getProductsByBrand = async (req, res) => {
       query.$text = { $search: name };
     }
 
+    /* ================= VARIANT FILTER ================= */
+    const variantFilter = {};
+
+    if (color) {
+      variantFilter.color = color;
+    }
+
+    if (inStock === "true") {
+      variantFilter.stockQuantity = { $gt: 0 };
+    }
+
     /* ================= SORT ================= */
     let sortOption = { createdAt: -1 };
+
     if (sort === "name_asc") sortOption = { name: 1 };
     if (sort === "name_desc") sortOption = { name: -1 };
+
+    /* ================= QUERY ================= */
+    const total = await Product.countDocuments(query);
 
     const products = await Product.find(query)
       .populate("category", "name")
@@ -532,29 +514,29 @@ exports.getProductsByBrand = async (req, res) => {
       .limit(limit)
       .lean();
 
-    /* ================= FORMAT – PUBLIC ================= */
+    /* ================= FORMAT (GIỐNG CATEGORY) ================= */
     const formatted = products
       .map((p) => {
-        // 🔥 CHỐT CHẶN CUỐI – KHÔNG CÓ groupId → LOẠI
-        if (!p.groupId) return null;
+        let variants = p.variants || [];
 
-        const variants = (p.variants || []).filter((v) => {
+        // lọc variant theo điều kiện
+        variants = variants.filter((v) => {
           if (!v || typeof v.price !== "number") return false;
           if (color && String(v.color?._id) !== String(color)) return false;
           if (inStock === "true" && v.stockQuantity <= 0) return false;
           return true;
         });
 
-        if (!variants.length) return null;
+        if (variants.length === 0) return null;
 
         return {
           _id: p._id,
-          groupId: p.groupId,  
           name: p.name,
           brand: p.brand,
           category: p.category,
-          variants,
+          variants, // ✅ GIỮ NGUYÊN salePrice
           coverImage:
+            p.coverImage ||
             variants[0]?.coverImage ||
             variants[0]?.images?.[0] ||
             "/imgs/placeholder.jpg",
@@ -565,9 +547,9 @@ exports.getProductsByBrand = async (req, res) => {
     res.json({
       success: true,
       data: formatted,
-      total: formatted.length, // ✅ ĐÚNG LOGIC
+      total,
       page,
-      totalPages: Math.ceil(formatted.length / limit),
+      totalPages: Math.ceil(total / limit),
     });
   } catch (err) {
     console.error("GET PRODUCTS BY BRAND ERROR:", err);
@@ -722,6 +704,7 @@ exports.getProductById = async (req, res) => {
     res.status(500).json({ error: "Lỗi", details: err.message });
   }
 };
+
 // === GET BY GROUP ID ===
 exports.getProductByGroupId = async (req, res) => {
   try {
@@ -734,7 +717,7 @@ exports.getProductByGroupId = async (req, res) => {
       .populate("variants.size", "name code")
       .lean();
 
-    if (!product) {
+    if (!product) { 
       return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
     }
 
@@ -747,6 +730,7 @@ exports.getProductByGroupId = async (req, res) => {
     res.status(500).json({ error: "Lỗi server", details: err.message });
   }
 };
+
 
 exports.filterProducts = async (req, res) => {
   try {
