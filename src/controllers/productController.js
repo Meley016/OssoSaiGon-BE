@@ -428,6 +428,7 @@ exports.getProductsByCategories = async (req, res) => {
 
       return {
         _id: p._id,
+        groupId: p.groupId,
         name: p.name,
         coverImage:
           p.coverImage ||
