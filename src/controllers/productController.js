@@ -532,6 +532,7 @@ exports.getProductsByBrand = async (req, res) => {
 
         return {
           _id: p._id,
+          groupId: p.groupId,
           name: p.name,
           brand: p.brand,
           category: p.category,
