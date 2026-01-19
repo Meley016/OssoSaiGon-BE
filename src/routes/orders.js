@@ -44,5 +44,11 @@ router.get("/check-vnpay", async (req, res) => {
     res.status(500).json({ status: "error", message: "Server error" });
   }
 });
+// STRIPE – confirm payment
+router.post(
+  "/confirm-stripe",
+  apiProtect,
+  orderController.confirmStripePayment
+);
 
 module.exports = router;

@@ -74,17 +74,21 @@ exports.preCreateOrder = async (req, res) => {
         return res.status(400).json({ error: `Hết hàng: ${it.sku}` });
       }
 
-      const price = Number(variant.price) || 0;
+      const unitPrice =
+        variant.salePrice && variant.salePrice > 0
+          ? Number(variant.salePrice)
+          : Number(variant.price);
+
       const qty = Number(it.quantity) || 0;
 
-      subtotal += price * qty;
+      subtotal += unitPrice * qty;
 
       orderItems.push({
         productId: product._id,
         productName: product.name,
         sku: variant.sku,
         quantity: qty,
-        price,
+        price: unitPrice,
         variantInfo: {
           color: variant.color,
           size: variant.size,
@@ -161,29 +165,29 @@ exports.preCreateOrder = async (req, res) => {
     
     await session.commitTransaction();
 
-    if (!["cod", "bank_transfer"].includes(paymentMethod)) {
-      const user = await User.findById(userId);
-      if (user?.email) {
-        (async () => {
-          try {
-            await sendEmail({
-              to: user.email,
-              subject: `Xác nhận đơn hàng ${createdOrder.orderCode}`,
-              templateName: "order-confirmation",
-              variables: {
-                orderCode: createdOrder.orderCode,
-                items: createdOrder.items.map(i => `<li>${i.productName} - ${i.quantity} x ${i.price.toLocaleString()} VND</li>`).join(""),
-                total: createdOrder.total.toLocaleString(),
-                customerName: user.name || "",
-                statusMessage: "thành công",
-              },
-            });
-          } catch (err) {
-            console.error("Gửi mail xác nhận đơn hàng thất bại:", err.message);
-          }
-        })();
-      }
-    }
+    // if (!["cod", "bank_transfer"].includes(paymentMethod)) {
+    //   const user = await User.findById(userId);
+    //   if (user?.email) {
+    //     (async () => {
+    //       try {
+    //         await sendEmail({
+    //           to: user.email,
+    //           subject: `Xác nhận đơn hàng ${createdOrder.orderCode}`,
+    //           templateName: "order-confirmation",
+    //           variables: {
+    //             orderCode: createdOrder.orderCode,
+    //             items: createdOrder.items.map(i => `<li>${i.productName} - ${i.quantity} x ${i.price.toLocaleString()} VND</li>`).join(""),
+    //             total: createdOrder.total.toLocaleString(),
+    //             customerName: user.name || "",
+    //             statusMessage: "thành công",
+    //           },
+    //         });
+    //       } catch (err) {
+    //         console.error("Gửi mail xác nhận đơn hàng thất bại:", err.message);
+    //       }
+    //     })();
+    //   }
+    // }
     // ===============================
     // ✅ 6. VNPAY
     // ===============================
@@ -488,7 +492,10 @@ exports.updateOrder = async (req, res) => {
       for (const item of newItems) {
         const product = products.find(p => p._id.toString() === item.productId);
         const variant = product.variants.find(v => String(v.sku) === item.sku);
-        const price = Number(item.price || variant.price || 0);
+        const price = variant.salePrice && variant.salePrice > 0
+          ? Number(variant.salePrice)
+          : Number(variant.price);
+
         subtotal += price * item.quantity;
         newOrderItems.push({
           productId: item.productId,
@@ -704,5 +711,61 @@ exports.getOrdersForUser = async (req, res) => {
   } catch (err) {
     console.error("getOrdersForUser error:", err);
     res.status(500).json({ error: "Lỗi tải danh sách đơn của bạn" });
+  }
+};
+exports.confirmStripePayment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { orderId, paymentIntentId } = req.body;
+
+    const order = await Order.findOne({
+      _id: orderId,
+      isTemporary: true,
+      status: "pending",
+    }).session(session);
+
+    if (!order) {
+      await session.abortTransaction();
+      return res.status(400).json({ error: "Đơn hàng đã được xử lý hoặc không hợp lệ" });
+    }
+
+    // 🔒 KHÓA ĐƠN – CHỐNG DOUBLE CALL
+    order.status = "processing";
+    await order.save({ session });
+
+    // ✅ FINALIZE
+    await finalizeOrder(order);
+
+    order.status = "preparing";
+    order.isTemporary = false;
+    order.paymentIntentId = paymentIntentId;
+    await order.save({ session });
+
+    await session.commitTransaction();
+
+    // ✅ GỬI MAIL SAU KHI COMMIT
+    const user = await User.findById(order.userId);
+    if (user?.email) {
+      await sendEmail({
+        to: user.email,
+        subject: `Xác nhận đơn hàng ${order.orderCode}`,
+        templateName: "order-confirmation",
+        variables: {
+          orderCode: order.orderCode,
+          total: order.total.toLocaleString(),
+          statusMessage: "Thanh toán thành công",
+        },
+      });
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    await session.abortTransaction();
+    console.error("confirmStripePayment error:", err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    session.endSession();
   }
 };
