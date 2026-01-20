@@ -1,7 +1,97 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/reset.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.0/dist/antd.min.css" />
 <link rel="stylesheet" href="/css/globe.css">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
 <style>
+  #bestSellerList {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);  
+  gap: 16px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.bs-item {
+  position: relative;
+  background: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #eee;
+  cursor: grab;
+  transition: all 0.2s ease;
+}
+
+.bs-item:hover {
+  box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+  transform: translateY(-3px);
+}
+
+.bs-item:active {
+  cursor: grabbing;
+}
+
+
+.bs-thumb {
+  position: relative;
+}
+
+.bs-thumb img {
+  object-fit: cover;
+  border-radius: 6px;
+}
+.bs-item img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.bs-index {
+  position: absolute;
+  background: #111;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  z-index: 5;
+}
+.bs-remove {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(0,0,0,0.75);
+  color: #fff;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.bs-remove:hover {
+  background: #ef4444;
+}
+.bs-item .info {
+  padding: 10px 12px 14px;
+}
+
+.bs-item h4 {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+
+.bs-item .price {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ef4444;
+}
+
+
   .price-display {
   margin: 8px 0;
   min-height: 24px;
@@ -74,6 +164,7 @@
 #productGrid.grid-product.list-view .product-checkbox-wrapper {
   flex: 0 0 40px;
   text-align: center;
+  z-index: 2;
 }
 
 /* Ảnh - Cố định 100px */
@@ -456,7 +547,7 @@
       font-weight: 500;
       color: #333;
       font-size: 14px;
-      border-radius: 10px;
+      border-radius: 6px;
       border: 1px solid #e0e0e0;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     ">
@@ -464,14 +555,31 @@
       Chọn trang
     </label>
 
+    <button id="btn-add-bestsaller" style="
+      background: #fff;
+      color: #000000;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    ">
+      Best Seller
+    </button>
+
     <!-- View Toggle - Icon đẹp hơn bằng SVG -->
     <div class="view-toggle" style="
       display: flex;
       gap: 16px;
       background: #ffffff;
-      padding: 8px 16px;
-      border-radius: 10px;
+      padding: 5px 16px;
       border: 1px solid #e0e0e0;
+      border-radius: 6px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     ">
       <button class="view-btn active" data-view="grid" title="Chế độ lưới" style="
@@ -605,6 +713,25 @@
   </div>
 </div>
 
+<div id="bestSellerModal" style="max-height: 100%;" class="modal">
+  <div class="modal-content" style="max-width:70%; ">
+    <span class="close" onclick="closeBestSellerModal()">×</span>
+
+    <h3>Quản lý Best Seller</h3>
+    <p style="font-size:13px;color:#666">
+      Tối đa 16 sản phẩm – kéo để thay đổi thứ tự hiển thị
+    </p>
+
+    <div id="bestSellerList" class="bs-grid"></div>
+
+    <div style="text-align:right;margin-top:20px;">
+      <button class="btn-custom" id="btnAddSelected"">Thêm</button>
+      <button class="btn-reset" onclick="closeBestSellerModal()">Hủy</button>
+      <button class="btn-custom" onclick="saveBestSeller()">Lưu</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Detail -->
 <div id="detailModal" class="modal">
   <div class="modal-content">
@@ -653,6 +780,9 @@ let currentFilters = {};
 let currentPage = 1;
 const limit = 21;
 let selectedProductIds = [];
+let bestSellerProducts = [];   //danh sách ĐÃ LƯU từ DB
+let draftSelectedProducts = []; //danh sách chọn TẠM trong modal
+const BEST_SELLER_LIMIT = 16;
 
 // Toggle Grid / List view
 let currentView = 'grid';
@@ -1075,6 +1205,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const data = await res.json();
       const products = Array.isArray(data.data) ? data.data : [];
+      window.allProductsCache = products;
 
       grid.innerHTML = "";
 
@@ -1734,6 +1865,166 @@ async function loadProductReviews(productId) {
   }
 }
 
+// Best saller modal
+async function fetchBestSeller() {
+  const res = await fetch("/api/bestseller");
+  const json = await res.json();
+  bestSellerProducts = json.data || [];
+}
+
+document.getElementById("btn-add-bestsaller").onclick = () => {
+  openBestSellerModal();
+};
+
+async function openBestSellerModal() {
+  try {
+    const res = await fetch("/api/bestseller");
+    const json = await res.json();
+
+    bestSellerProducts = (json.data || []).map((product, index) => {
+      const variant = product?.variants?.[0];
+
+      const coverImage =
+        variant?.coverImage ||
+        variant?.images?.[0] ||
+        "/imgs/placeholder.jpg";
+
+      return {
+        _id: product._id,
+        name: product.name,
+        coverImage,
+        position: product._bestSellerPosition ?? index,
+        _missing: false,
+      };
+    });
+
+    // clone sang draft
+    draftSelectedProducts = JSON.parse(JSON.stringify(bestSellerProducts));
+
+    renderBestSellerModal();
+    document.getElementById("bestSellerModal").style.display = "block";
+  } catch (err) {
+    console.error(err);
+    showToast("Không tải được Best Seller", "error");
+  }
+}
+
+function closeBestSellerModal() {
+  document.getElementById("bestSellerModal").style.display = "none";
+}
+
+/* ================= RENDER ================= */
+
+function renderBestSellerModal() {
+  const list = document.getElementById("bestSellerList");
+  list.innerHTML = "";
+
+  draftSelectedProducts.forEach((p, index) => {
+    const li = document.createElement("li");
+    li.className = "bs-item";
+    li.dataset.id = p._id;
+
+    li.innerHTML = `
+      <div class="bs-thumb">
+        <span class="bs-index">${index + 1}</span>
+        <img src="${p.coverImage}" onerror="this.src='/imgs/placeholder.jpg'">
+      </div>
+      <div class="bs-name">
+        ${p.name}
+      </div>
+      <button class="bs-remove">Xóa</button>
+    `;
+
+    li.querySelector(".bs-remove").onclick = () => {
+      draftSelectedProducts = draftSelectedProducts.filter(
+        x => String(x._id) !== String(p._id)
+      );
+      renderBestSellerModal();
+    };
+
+    list.appendChild(li);
+  });
+
+  enableDragSort();
+}
+
+/* ================= DRAG SORT ================= */
+
+function enableDragSort() {
+  const el = document.getElementById("bestSellerList");
+  if (!el) return;
+
+  new Sortable(el, {
+    animation: 150,
+    onEnd: () => {
+      const orderedIds = [...el.children].map(li => li.dataset.id);
+      draftSelectedProducts.sort(
+        (a, b) =>
+          orderedIds.indexOf(String(a._id)) -
+          orderedIds.indexOf(String(b._id))
+      );
+      renderBestSellerModal();
+    }
+  });
+}
+
+/* ================= ADD FROM SELECTED ================= */
+
+document.getElementById("btnAddSelected").onclick = () => {
+  const selected = window.allProductsCache.filter(p =>
+    selectedProductIds.includes(p._id)
+  );
+
+  selected.forEach(p => {
+    const exists = draftSelectedProducts.some(
+      x => String(x._id) === String(p._id)
+    );
+
+    const variant = p.variants?.[0];
+
+    const coverImage =
+      variant?.coverImage ||
+      variant?.images?.[0] ||
+      "/imgs/placeholder.jpg";
+
+    if (!exists && draftSelectedProducts.length < BEST_SELLER_LIMIT) {
+      draftSelectedProducts.push({
+        _id: p._id,
+        name: p.name,
+        coverImage,
+        _missing: false,
+      });
+    }
+  });
+
+  if (draftSelectedProducts.length > BEST_SELLER_LIMIT) {
+    showToast("Tối đa 16 sản phẩm", "error");
+    draftSelectedProducts = draftSelectedProducts.slice(0, 16);
+  }
+
+  renderBestSellerModal();
+};
+
+/* ================= SAVE ================= */
+
+async function saveBestSeller() {
+  try {
+    const productIds = draftSelectedProducts.map(p => p._id);
+
+    await fetch("/api/bestseller", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productIds })
+    });
+
+    bestSellerProducts = [...draftSelectedProducts];
+    showToast("Đã lưu Best Seller");
+    closeBestSellerModal();
+  } catch (err) {
+    console.error(err);
+    showToast("Lỗi lưu Best Seller", "error");
+  }
+}
 async function deleteReview(reviewId, productId) {
   if (!confirm("Xóa bình luận này?")) return;
 

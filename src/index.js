@@ -36,9 +36,11 @@ const preorderRoutes = require("./routes/preorder")
 const statRoutes = require("./routes/adminStats")
 const notificationRoutes = require("./routes/notification");
 const newsletterRoute = require("./routes/newletter");
+const bestSallerRoutes = require("./routes/bestSaller");
 
 // === CONTROLLER ===
 const dashboardController = require("./controllers/dashboardController");
+const BestSaler = require("./models/BestSaller");
 
 // === CONNECT DB ===
 connectDB();
@@ -220,13 +222,13 @@ app.use("/api/banners", bannerRoutes);
 app.use("/api/main-categories", mainCategoryRoutes);
 
 app.use("/api/payment", paymentRoutes);
-app.use("/api/stripe", paymentRoutes);
+// app.use("/api/stripe", paymentRoutes);
 app.use("/api/footer", footerRoutes);
 app.use("/api/preorder", preorderRoutes);
 app.use("/api/report", statRoutes);
 app.use("/api/newsletter", newsletterRoute);
 app.use("/api/notifications", notificationRoutes);
-
+app.use("/api/bestseller", bestSallerRoutes)
 
 /* =============================
    ✅ ADMIN ROUTES
