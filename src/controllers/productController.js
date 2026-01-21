@@ -26,6 +26,7 @@ exports.searchProducts = async (req, res) => {
       .populate("variants.color", "name code")
       .populate("variants.size", "name code")
       .select("name variants coverImage")
+      .select("name groupId variants coverImage")
       .limit(10)
       .lean();
 
@@ -72,6 +73,7 @@ exports.searchProducts = async (req, res) => {
 
       return {
         _id: p._id,
+        groupId: p.groupId,
         name: p.name,
         coverImage,
         minPrice,
