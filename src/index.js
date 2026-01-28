@@ -32,8 +32,8 @@ const bannerRoutes = require("./routes/banner");
 const mainCategoryRoutes = require("./routes/mainCategories");
 const paymentRoutes = require("./routes/payment");
 const footerRoutes = require("./routes/footer");
-const preorderRoutes = require("./routes/preorder")
-const statRoutes = require("./routes/adminStats")
+const preorderRoutes = require("./routes/preorder");
+const statRoutes = require("./routes/adminStats");
 const notificationRoutes = require("./routes/notification");
 const newsletterRoute = require("./routes/newletter");
 const bestSallerRoutes = require("./routes/bestSaller");
@@ -47,6 +47,38 @@ connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  );
+  next();
+});
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://ososaigon.com",
+  "https://ososaigon-user.vercel.app",
+  "https://ososaigon-admin.onrender.com",
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // Postman, server-to-server
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("CORS blocked by Safari"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  })
+);
 
 /* =============================
    ✅ HELMET + CSP
@@ -111,22 +143,28 @@ const publicCSP = helmet.contentSecurityPolicy({
       "https://cdn.jsdelivr.net",
       "https://cdnjs.cloudflare.com",
     ],
-    fontSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+    fontSrc: [
+      "'self'",
+      "data:",
+      "https://fonts.gstatic.com",
+      "https://cdn.jsdelivr.net",
+    ],
   },
 });
 
 // Áp dụng CSP cho payment route
-app.use("/api/payment", publicCSP);
-app.use("/api/stripe", publicCSP);
-/* =============================
-   ✅ CORS ỔN ĐỊNH – KHÔNG BLOCK NGẦM
-============================= */
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  })
-);
+app.use(publicCSP);
+// app.use("/api/payment", publicCSP);
+// app.use("/api/stripe", publicCSP);
+// /* =============================
+//    ✅ CORS ỔN ĐỊNH – KHÔNG BLOCK NGẦM
+// ============================= */
+// app.use(
+//   cors({
+//     origin: true,
+//     credentials: true,
+//   })
+// );
 
 /* =============================
    ✅ NÉN RESPONSE – GIẢM LOAD 60–80%
@@ -228,7 +266,7 @@ app.use("/api/preorder", preorderRoutes);
 app.use("/api/report", statRoutes);
 app.use("/api/newsletter", newsletterRoute);
 app.use("/api/notifications", notificationRoutes);
-app.use("/api/bestseller", bestSallerRoutes)
+app.use("/api/bestseller", bestSallerRoutes);
 
 /* =============================
    ✅ ADMIN ROUTES
