@@ -99,6 +99,7 @@ const publicCSP = helmet.contentSecurityPolicy({
       "https://cdn.jsdelivr.net",
       "https://cdnjs.cloudflare.com",
     ],
+    scriptSrcAttr: ["'unsafe-inline'"],
     frameSrc: [
       "https://js.stripe.com",
       "https://www.paypal.com",
