@@ -52,7 +52,7 @@ app.use((req, res, next) => {
   res.header("Access-Control-Allow-Credentials", "true");
   res.header(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization",
   );
   next();
 });
@@ -77,7 +77,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  })
+  }),
 );
 
 /* =============================
@@ -114,6 +114,7 @@ const publicCSP = helmet.contentSecurityPolicy({
       "https://ososaigon.com",
       "https://ososaigon-user.vercel.app",
       "https://ososaigon-admin.onrender.com",
+      "https://res.cloudinary.com",
       "https://api.stripe.com",
       "https://checkout.stripe.com",
       "https://api-m.paypal.com",
@@ -194,7 +195,7 @@ app.use(
   express.static(path.join(__dirname, "public"), {
     maxAge: "30d",
     etag: true,
-  })
+  }),
 );
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
@@ -220,7 +221,7 @@ app.use(
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 24 * 60 * 60 * 1000,
     },
-  })
+  }),
 );
 
 /* =============================
