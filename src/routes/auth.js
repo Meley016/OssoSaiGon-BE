@@ -6,13 +6,11 @@ const {
   register,
   login,
   logout,
-  me
+  me,
 } = require("../controllers/authController");
 const requireRole = require("../middlewares/requireRole");
 const { protect, apiProtect } = require("../middlewares/auth");
-const dashboardCtrl = require("../controllers/dashboardController");
 const authController = require("../controllers/authController");
-
 
 // ✅ Page Login admin (render view)
 router.get("/login", (req, res) => {
@@ -29,11 +27,14 @@ router.post("/login", login);
 router.get("/logout", logout);
 router.post("/logout", logout);
 
+router.post("/refresh", authController.refresh);
+
 // ✅ Lấy thông tin user từ JWT
 router.get("/me", apiProtect, me);
 
 // ✅ Admin Dashboard redirect
-router.get("/dashboard",
+router.get(
+  "/dashboard",
   protect,
   requireRole("admin", "writer", "productAdder"),
   (req, res) => {
@@ -41,15 +42,15 @@ router.get("/dashboard",
 
     if (role === "admin") return res.redirect("/admin/dashboard/product");
     if (role === "writer") return res.redirect("/admin/dashboard/blog");
-    if (role === "productAdder") return res.redirect("/admin/dashboard/product");
+    if (role === "productAdder")
+      return res.redirect("/admin/dashboard/product");
 
     // fallback nếu role lạ
     res.redirect("/");
-  }
+  },
 );
 
 router.post("/forgot-password/send-otp", authController.sendForgotOtp);
 router.post("/forgot-password/verify", authController.verifyForgotOtp);
-
 
 module.exports = router;

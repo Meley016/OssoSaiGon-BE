@@ -2,21 +2,12 @@
 const jwt = require("jsonwebtoken");
 const { User } = require("../models/User");
 
-exports.protect = async (req, res, next) => {
-  try {
-    const token = req.cookies.token;
-    if (!token) return res.redirect("/admin/login");
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).select("-password");
-
-    if (!req.user) return res.redirect("/admin/login");
-
-    next();
-  } catch (err) {
-    res.clearCookie("token");
+exports.protect = (req, res, next) => {
+  if (!req.session.admin) {
     return res.redirect("/admin/login");
   }
+  req.user = req.session.admin;
+  next();
 };
 
 exports.adminAuth = (req, res, next) => {
@@ -26,23 +17,17 @@ exports.adminAuth = (req, res, next) => {
   next();
 };
 exports.apiProtect = async (req, res, next) => {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer "))
+    return res.status(401).json({ error: "No token" });
+
   try {
-    const token = req.cookies.token;
-    if (!token) {
-      return res.status(401).json({ isAuthenticated: false, error: "Chưa đăng nhập!" });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const token = auth.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
     req.user = await User.findById(decoded.id).select("-password");
-
-    if (!req.user) {
-      return res.status(401).json({ isAuthenticated: false });
-    }
-
     next();
-  } catch (err) {
-    res.clearCookie("token");
-    return res.status(401).json({ isAuthenticated: false, error: "Token hết hạn!" });
+  } catch {
+    res.status(401).json({ error: "Token expired" });
   }
 };
 
@@ -62,13 +47,18 @@ exports.requireRole = (...roles) => {
 exports.allowRoles = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).render("admin/403", { title: "Không có quyền truy cập" });
+      return res
+        .status(403)
+        .render("admin/403", { title: "Không có quyền truy cập" });
     }
     next();
   };
 };
 exports.requireVNPayRole = (req, res, next) => {
-  if (!req.session.admin || !['admin', 'partner-vnpay'].includes(req.session.admin.role)) {
+  if (
+    !req.session.admin ||
+    !["admin", "partner-vnpay"].includes(req.session.admin.role)
+  ) {
     req.session.returnTo = req.originalUrl;
     return res.redirect("/admin/login");
   }
