@@ -12,7 +12,7 @@ async function releaseStock(order) {
     try {
       await Product.updateOne(
         { "variants.sku": it.sku },
-        { $inc: { "variants.$.stockQuantity": Number(it.quantity) || 0 } }
+        { $inc: { "variants.$.stockQuantity": Number(it.quantity) || 0 } },
       );
     } catch (err) {
       console.warn("releaseStock error for SKU", it.sku, err.message);
@@ -25,13 +25,15 @@ const finalizeOrder = async (order) => {
   for (const item of order.items) {
     await Product.updateOne(
       { "variants.sku": item.sku },
-      { $inc: { "variants.$.stockQuantity": -item.quantity } }
+      { $inc: { "variants.$.stockQuantity": -item.quantity } },
     );
   }
 
   // Tăng usedCount promotion
   if (order.promotionId) {
-    await Promotion.findByIdAndUpdate(order.promotionId, { $inc: { usedCount: 1 } });
+    await Promotion.findByIdAndUpdate(order.promotionId, {
+      $inc: { usedCount: 1 },
+    });
   }
 
   // Xóa giỏ hàng
@@ -39,7 +41,9 @@ const finalizeOrder = async (order) => {
 
   // Tích điểm
   const points = Math.floor(order.total / 10000);
-  await User.findByIdAndUpdate(order.userId, { $inc: { "loyalty.points": points } });
+  await User.findByIdAndUpdate(order.userId, {
+    $inc: { "loyalty.points": points },
+  });
 };
 
 // API DUY NHẤT DÙNG CHO CHECKOUT
@@ -62,10 +66,12 @@ exports.preCreateOrder = async (req, res) => {
     for (const it of items) {
       const product = await Product.findById(it.productId);
       if (!product) {
-        return res.status(400).json({ error: `Sản phẩm ${it.productId} không tồn tại` });
+        return res
+          .status(400)
+          .json({ error: `Sản phẩm ${it.productId} không tồn tại` });
       }
 
-      const variant = product.variants.find(v => v.sku === it.sku);
+      const variant = product.variants.find((v) => v.sku === it.sku);
       if (!variant) {
         return res.status(400).json({ error: `SKU ${it.sku} không tồn tại` });
       }
@@ -105,7 +111,10 @@ exports.preCreateOrder = async (req, res) => {
       const promo = await Promotion.findById(promotionId);
       if (promo?.isActive) {
         if (promo.type === "percentage") {
-          discount = Math.min(subtotal * (promo.value / 100), promo.maxDiscount || Infinity);
+          discount = Math.min(
+            subtotal * (promo.value / 100),
+            promo.maxDiscount || Infinity,
+          );
         } else if (promo.type === "fixed") {
           discount = Math.min(promo.value, subtotal);
         }
@@ -127,20 +136,25 @@ exports.preCreateOrder = async (req, res) => {
     // ===============================
     // ✅ 4. TẠO ĐƠN HÀNG
     // ===============================
-    const order = await Order.create([{
-      userId,
-      paymentMethod,
-      shippingAddress,
-      items: orderItems,
-      subtotal,
-      vat,            // ✅ LƯU VAT
-      discount,
-      total,          // ✅ TOTAL SAU THUẾ
-      promotionId: promotionId || null,
-      status: "pending",
-      isTemporary: !isAutoFinalize,
-      autoFinalize: isAutoFinalize,
-    }], { session });
+    const order = await Order.create(
+      [
+        {
+          userId,
+          paymentMethod,
+          shippingAddress,
+          items: orderItems,
+          subtotal,
+          vat, // ✅ LƯU VAT
+          discount,
+          total, // ✅ TOTAL SAU THUẾ
+          promotionId: promotionId || null,
+          status: "pending",
+          isTemporary: !isAutoFinalize,
+          autoFinalize: isAutoFinalize,
+        },
+      ],
+      { session },
+    );
 
     const createdOrder = order[0];
 
@@ -153,7 +167,6 @@ exports.preCreateOrder = async (req, res) => {
 
       await finalizeOrder(createdOrder);
       await createdOrder.save({ session });
-      await session.commitTransaction();
 
       return res.json({
         success: true,
@@ -162,7 +175,7 @@ exports.preCreateOrder = async (req, res) => {
         redirectUrl: `/order-success/${createdOrder._id}`,
       });
     }
-    
+
     await session.commitTransaction();
 
     // if (!["cod", "bank_transfer"].includes(paymentMethod)) {
@@ -205,7 +218,6 @@ exports.preCreateOrder = async (req, res) => {
       orderId: createdOrder._id,
       requireStripe: true,
     });
-
   } catch (err) {
     await session.abortTransaction();
     console.error("preCreateOrder error:", err);
@@ -219,24 +231,46 @@ exports.createOrder = async (req, res) => {
   try {
     console.log("Received createOrder payload:", req.body);
 
-    const { userId, promotionId, paymentMethod, shippingAddress, items } = req.body;
+    const { userId, promotionId, paymentMethod, shippingAddress, items } =
+      req.body;
 
     // Validation cơ bản
-    if (!userId || !paymentMethod || !shippingAddress || !items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "Thiếu các trường bắt buộc (userId, paymentMethod, shippingAddress, items)" });
+    if (
+      !userId ||
+      !paymentMethod ||
+      !shippingAddress ||
+      !items ||
+      !Array.isArray(items) ||
+      items.length === 0
+    ) {
+      return res
+        .status(400)
+        .json({
+          error:
+            "Thiếu các trường bắt buộc (userId, paymentMethod, shippingAddress, items)",
+        });
     }
 
-    if (!["cash", "bank_transfer", "credit_card", "vnpay"].includes(paymentMethod)) {
-      return res.status(400).json({ error: "Phương thức thanh toán không hợp lệ" });
+    if (
+      !["cash", "bank_transfer", "credit_card", "vnpay"].includes(paymentMethod)
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Phương thức thanh toán không hợp lệ" });
     }
 
     const user = await User.findById(userId).select("-password");
-    if (!user) return res.status(400).json({ error: `Khách hàng với ID ${userId} không tồn tại` });
+    if (!user)
+      return res
+        .status(400)
+        .json({ error: `Khách hàng với ID ${userId} không tồn tại` });
 
     // Validate items
     for (const it of items) {
       if (!it.productId || !it.sku) {
-        return res.status(400).json({ error: "Mỗi item phải có productId và sku" });
+        return res
+          .status(400)
+          .json({ error: "Mỗi item phải có productId và sku" });
       }
       if (!it.quantity || isNaN(it.quantity) || Number(it.quantity) < 1) {
         return res.status(400).json({ error: "Số lượng item không hợp lệ" });
@@ -244,12 +278,16 @@ exports.createOrder = async (req, res) => {
     }
 
     // Load products và validate SKU
-    const productIds = [...new Set(items.map(i => i.productId))];
+    const productIds = [...new Set(items.map((i) => i.productId))];
     const products = await Product.find({ _id: { $in: productIds } }).lean();
 
     if (products.length !== productIds.length) {
-      const missing = productIds.filter(id => !products.some(p => p._id.toString() === id));
-      return res.status(400).json({ error: `Sản phẩm với ID ${missing.join(", ")} không tồn tại` });
+      const missing = productIds.filter(
+        (id) => !products.some((p) => p._id.toString() === id),
+      );
+      return res
+        .status(400)
+        .json({ error: `Sản phẩm với ID ${missing.join(", ")} không tồn tại` });
     }
 
     // Validate SKU & stock & build order items
@@ -257,22 +295,35 @@ exports.createOrder = async (req, res) => {
     const orderItems = [];
 
     for (const it of items) {
-      const product = products.find(p => p._id.toString() === it.productId);
-      if (!product) return res.status(400).json({ error: `Sản phẩm ${it.productId} không tồn tại` });
+      const product = products.find((p) => p._id.toString() === it.productId);
+      if (!product)
+        return res
+          .status(400)
+          .json({ error: `Sản phẩm ${it.productId} không tồn tại` });
 
-      const variant = (product.variants || []).find(v => v.sku === it.sku);
+      const variant = (product.variants || []).find((v) => v.sku === it.sku);
       if (!variant) {
-        return res.status(400).json({ error: `SKU ${it.sku} không tồn tại trong sản phẩm ${product.name}` });
+        return res
+          .status(400)
+          .json({
+            error: `SKU ${it.sku} không tồn tại trong sản phẩm ${product.name}`,
+          });
       }
 
       const qty = Number(it.quantity);
       if (variant.stockQuantity < qty) {
-        return res.status(400).json({ error: `SKU ${it.sku}: Không đủ tồn kho (cần ${qty}, còn ${variant.stockQuantity})` });
+        return res
+          .status(400)
+          .json({
+            error: `SKU ${it.sku}: Không đủ tồn kho (cần ${qty}, còn ${variant.stockQuantity})`,
+          });
       }
 
       const price = Number(it.price || variant.price || 0);
       if (isNaN(price) || price < 0) {
-        return res.status(400).json({ error: `Giá SKU ${it.sku} không hợp lệ` });
+        return res
+          .status(400)
+          .json({ error: `Giá SKU ${it.sku} không hợp lệ` });
       }
 
       subtotal += price * qty;
@@ -302,10 +353,15 @@ exports.createOrder = async (req, res) => {
     if (promotionId) {
       promotion = await Promotion.findById(promotionId).lean();
       if (!promotion || !promotion.isActive) {
-        return res.status(400).json({ error: "Mã khuyến mãi không hợp lệ hoặc đã hết hiệu lực" });
+        return res
+          .status(400)
+          .json({ error: "Mã khuyến mãi không hợp lệ hoặc đã hết hiệu lực" });
       }
       if (promotion.type === "percentage") {
-        discount = Math.min(subtotal * (promotion.value / 100), promotion.maxDiscount || Infinity);
+        discount = Math.min(
+          subtotal * (promotion.value / 100),
+          promotion.maxDiscount || Infinity,
+        );
       } else if (promotion.type === "fixed") {
         discount = Math.min(promotion.value, subtotal);
       } else if (promotion.type === "free_shipping") {
@@ -315,7 +371,9 @@ exports.createOrder = async (req, res) => {
 
     const total = subtotal - (discount || 0);
     if (isNaN(total) || total < 0) {
-      return res.status(400).json({ error: "Tổng tiền cuối cùng không hợp lệ" });
+      return res
+        .status(400)
+        .json({ error: "Tổng tiền cuối cùng không hợp lệ" });
     }
 
     // Generate order code
@@ -343,13 +401,15 @@ exports.createOrder = async (req, res) => {
     for (const it of orderItems) {
       await Product.updateOne(
         { "variants.sku": it.sku },
-        { $inc: { "variants.$.stockQuantity": -it.quantity } }
+        { $inc: { "variants.$.stockQuantity": -it.quantity } },
       );
     }
 
     // Increment promotion usedCount
     if (promotionId) {
-      await Promotion.findByIdAndUpdate(promotionId, { $inc: { usedCount: 1 } });
+      await Promotion.findByIdAndUpdate(promotionId, {
+        $inc: { usedCount: 1 },
+      });
     }
 
     // Populate dữ liệu trả về
@@ -369,21 +429,32 @@ exports.createOrder = async (req, res) => {
         console.error("VNPay URL creation failed:", err);
         await releaseStock(order); // Hoàn stock nếu lỗi
         await order.deleteOne(); // Xóa đơn hàng
-        return res.status(500).json({ error: "Lỗi tạo đơn hàng", details: err.message });
+        return res
+          .status(500)
+          .json({ error: "Lỗi tạo đơn hàng", details: err.message });
       }
     }
 
     return res.status(201).json(populatedOrder);
   } catch (err) {
     console.error("Lỗi tạo đơn hàng:", err);
-    return res.status(500).json({ error: "Lỗi tạo đơn hàng", details: err.message });
+    return res
+      .status(500)
+      .json({ error: "Lỗi tạo đơn hàng", details: err.message });
   }
 };
 
 exports.updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { userId, paymentMethod, shippingAddress, items, status, promotionId } = req.body;
+    const {
+      userId,
+      paymentMethod,
+      shippingAddress,
+      items,
+      status,
+      promotionId,
+    } = req.body;
 
     console.log("Received payload:", req.body); // Debug payload
 
@@ -404,8 +475,14 @@ exports.updateOrder = async (req, res) => {
 
     // Cập nhật paymentMethod nếu có
     if (paymentMethod) {
-      if (!["cash", "bank_transfer", "credit_card", "vnpay"].includes(paymentMethod)) {
-        return res.status(400).json({ error: "Phương thức thanh toán không hợp lệ" });
+      if (
+        !["cash", "bank_transfer", "credit_card", "vnpay"].includes(
+          paymentMethod,
+        )
+      ) {
+        return res
+          .status(400)
+          .json({ error: "Phương thức thanh toán không hợp lệ" });
       }
       order.paymentMethod = paymentMethod;
     }
@@ -420,7 +497,9 @@ exports.updateOrder = async (req, res) => {
       if (promotionId) {
         const promotion = await Promotion.findById(promotionId).lean();
         if (!promotion || !promotion.isActive) {
-          return res.status(400).json({ error: "Mã khuyến mãi không hợp lệ hoặc không hoạt động" });
+          return res
+            .status(400)
+            .json({ error: "Mã khuyến mãi không hợp lệ hoặc không hoạt động" });
         }
         order.promotionId = promotionId;
       } else {
@@ -431,12 +510,12 @@ exports.updateOrder = async (req, res) => {
     // Xử lý items nếu có
     if (Array.isArray(items) && items.length > 0) {
       // Lấy danh sách SKU từ items mới và cũ
-      const oldItems = order.items.map(i => ({
+      const oldItems = order.items.map((i) => ({
         productId: i.productId.toString(),
         sku: i.sku,
         quantity: Number(i.quantity),
       }));
-      const newItems = items.map(i => ({
+      const newItems = items.map((i) => ({
         productId: String(i.productId),
         sku: String(i.sku),
         quantity: Number(i.quantity),
@@ -444,21 +523,40 @@ exports.updateOrder = async (req, res) => {
       }));
 
       // Load products cho tất cả SKU
-      const skus = [...new Set([...newItems.map(i => i.sku), ...oldItems.map(i => i.sku)])];
-      const products = await Product.find({ "variants.sku": { $in: skus } }).lean();
+      const skus = [
+        ...new Set([
+          ...newItems.map((i) => i.sku),
+          ...oldItems.map((i) => i.sku),
+        ]),
+      ];
+      const products = await Product.find({
+        "variants.sku": { $in: skus },
+      }).lean();
 
       // Kiểm tra tính hợp lệ của items
       for (const item of newItems) {
-        const product = products.find(p => p._id.toString() === item.productId);
+        const product = products.find(
+          (p) => p._id.toString() === item.productId,
+        );
         if (!product) {
-          return res.status(400).json({ error: `Sản phẩm ${item.productId} không tồn tại` });
+          return res
+            .status(400)
+            .json({ error: `Sản phẩm ${item.productId} không tồn tại` });
         }
-        const variant = product.variants.find(v => String(v.sku) === item.sku);
+        const variant = product.variants.find(
+          (v) => String(v.sku) === item.sku,
+        );
         if (!variant) {
-          return res.status(400).json({ error: `SKU ${item.sku} không tồn tại` });
+          return res
+            .status(400)
+            .json({ error: `SKU ${item.sku} không tồn tại` });
         }
         if (variant.stockQuantity < item.quantity) {
-          return res.status(400).json({ error: `SKU ${item.sku}: Không đủ tồn kho (cần ${item.quantity}, còn ${variant.stockQuantity})` });
+          return res
+            .status(400)
+            .json({
+              error: `SKU ${item.sku}: Không đủ tồn kho (cần ${item.quantity}, còn ${variant.stockQuantity})`,
+            });
         }
       }
 
@@ -473,7 +571,9 @@ exports.updateOrder = async (req, res) => {
       }
 
       // Cập nhật stock theo diff
-      const allSkus = [...new Set([...Object.keys(oldMap), ...Object.keys(newMap)])];
+      const allSkus = [
+        ...new Set([...Object.keys(oldMap), ...Object.keys(newMap)]),
+      ];
       for (const sku of allSkus) {
         const oldQty = oldMap[sku] || 0;
         const newQty = newMap[sku] || 0;
@@ -481,7 +581,7 @@ exports.updateOrder = async (req, res) => {
         if (diff !== 0) {
           await Product.updateOne(
             { "variants.sku": sku },
-            { $inc: { "variants.$.stockQuantity": -diff } }
+            { $inc: { "variants.$.stockQuantity": -diff } },
           );
         }
       }
@@ -490,11 +590,16 @@ exports.updateOrder = async (req, res) => {
       let subtotal = 0;
       const newOrderItems = [];
       for (const item of newItems) {
-        const product = products.find(p => p._id.toString() === item.productId);
-        const variant = product.variants.find(v => String(v.sku) === item.sku);
-        const price = variant.salePrice && variant.salePrice > 0
-          ? Number(variant.salePrice)
-          : Number(variant.price);
+        const product = products.find(
+          (p) => p._id.toString() === item.productId,
+        );
+        const variant = product.variants.find(
+          (v) => String(v.sku) === item.sku,
+        );
+        const price =
+          variant.salePrice && variant.salePrice > 0
+            ? Number(variant.salePrice)
+            : Number(variant.price);
 
         subtotal += price * item.quantity;
         newOrderItems.push({
@@ -521,7 +626,10 @@ exports.updateOrder = async (req, res) => {
       const promotion = await Promotion.findById(order.promotionId).lean();
       if (promotion) {
         if (promotion.type === "percentage") {
-          discount = Math.min((order.subtotal * promotion.value) / 100, promotion.maxDiscount || Infinity);
+          discount = Math.min(
+            (order.subtotal * promotion.value) / 100,
+            promotion.maxDiscount || Infinity,
+          );
         } else if (promotion.type === "fixed") {
           discount = Math.min(promotion.value, order.subtotal);
         } else if (promotion.type === "free_shipping") {
@@ -534,7 +642,16 @@ exports.updateOrder = async (req, res) => {
 
     // Cập nhật status nếu có
     if (status && status !== order.status) {
-      if (!["pending", "processing", "shipped", "completed", "cancelled", "expired"].includes(status)) {
+      if (
+        ![
+          "pending",
+          "processing",
+          "shipped",
+          "completed",
+          "cancelled",
+          "expired",
+        ].includes(status)
+      ) {
         return res.status(400).json({ error: "Trạng thái không hợp lệ" });
       }
       if (status === "cancelled" && order.status === "pending") {
@@ -585,7 +702,9 @@ exports.updateOrder = async (req, res) => {
     return res.status(200).json(populated);
   } catch (err) {
     console.error("updateOrder error:", err);
-    return res.status(500).json({ error: "Lỗi cập nhật đơn hàng", details: err.message });
+    return res
+      .status(500)
+      .json({ error: "Lỗi cập nhật đơn hàng", details: err.message });
   }
 };
 
@@ -613,7 +732,8 @@ exports.getOrderById = async (req, res) => {
       .populate("items.variantInfo.color", "name")
       .populate("items.variantInfo.size", "name")
       .lean();
-    if (!order) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+    if (!order)
+      return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
     res.json(order);
   } catch (err) {
     console.error("getOrderById error:", err);
@@ -625,9 +745,20 @@ exports.updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
     const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+    if (!order)
+      return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
 
-    if (status && !["pending", "processing", "shipped", "completed", "cancelled", "expired"].includes(status)) {
+    if (
+      status &&
+      ![
+        "pending",
+        "processing",
+        "shipped",
+        "completed",
+        "cancelled",
+        "expired",
+      ].includes(status)
+    ) {
       return res.status(400).json({ error: "Trạng thái không hợp lệ" });
     }
 
@@ -667,7 +798,8 @@ exports.updateOrderStatus = async (req, res) => {
 exports.cancelOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+    if (!order)
+      return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
 
     if (order.status === "pending") await releaseStock(order);
 
@@ -681,16 +813,19 @@ exports.cancelOrder = async (req, res) => {
 };
 exports.getOrderByIdForUser = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.orderId) 
+    const order = await Order.findById(req.params.orderId)
       .populate("items.variantInfo.color", "name")
       .populate("items.variantInfo.size", "name")
       .lean();
 
-    if (!order) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+    if (!order)
+      return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
 
     // Chỉ trả nếu user là chủ đơn
     if (order.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: "Bạn không có quyền xem đơn hàng này" });
+      return res
+        .status(403)
+        .json({ error: "Bạn không có quyền xem đơn hàng này" });
     }
 
     res.json({ order });
@@ -728,7 +863,9 @@ exports.confirmStripePayment = async (req, res) => {
 
     if (!order) {
       await session.abortTransaction();
-      return res.status(400).json({ error: "Đơn hàng đã được xử lý hoặc không hợp lệ" });
+      return res
+        .status(400)
+        .json({ error: "Đơn hàng đã được xử lý hoặc không hợp lệ" });
     }
 
     // 🔒 KHÓA ĐƠN – CHỐNG DOUBLE CALL

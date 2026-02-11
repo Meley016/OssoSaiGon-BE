@@ -239,3 +239,28 @@ exports.me = async (req, res) => {
     });
   }
 };
+exports.adminLogin = async (req, res) => {
+  const { email, password } = req.body;
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user) return res.status(401).json({ error: "Sai email" });
+
+  const ok = await bcrypt.compare(password, user.password);
+  if (!ok) return res.status(401).json({ error: "Sai mật khẩu" });
+
+  if (!["admin", "writer", "productAdder"].includes(user.role)) {
+    return res.status(403).json({ error: "Không có quyền truy cập admin" });
+  }
+
+  // ✅ LƯU SESSION
+  req.session.admin = {
+    _id: user._id,
+    email: user.email,
+    role: user.role,
+  };
+
+  res.json({
+    success: true,
+    redirect: "/admin/dashboard",
+  });
+};
