@@ -7,6 +7,7 @@ const {
   login,
   logout,
   me,
+  adminLogin,
 } = require("../controllers/authController");
 const requireRole = require("../middlewares/requireRole");
 const { protect, apiProtect } = require("../middlewares/auth");
@@ -16,6 +17,7 @@ const authController = require("../controllers/authController");
 router.get("/login", (req, res) => {
   res.render("admin/login", { title: "Đăng nhập" });
 });
+router.post("/admin-login", adminLogin);
 
 // ✅ Đăng ký
 router.post("/register", register);

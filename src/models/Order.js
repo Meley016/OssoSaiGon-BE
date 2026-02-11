@@ -25,7 +25,7 @@ const orderSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ["cod", "bank_transfer", "vnpay", "paypal", "stripe"], 
+      enum: ["cod", "bank_transfer", "vnpay", "paypal", "stripe"],
       required: true,
     },
 
@@ -48,7 +48,7 @@ const orderSchema = new mongoose.Schema(
           ref: "Product",
           required: true,
         },
-         productName: {      
+        productName: {
           type: String,
           required: true,
         },
@@ -72,14 +72,14 @@ const orderSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: [
-        "pending",     // Đơn tạm (chưa thanh toán, chưa trừ stock)
-        "preparing",   // COD/Bank → đã xác nhận, đang chuẩn bị hàng
-        "paid",        // VNPay thanh toán thành công
-        "processing",  // Đang xử lý (đã đóng gói, chờ giao)
-        "shipped",     // Đã giao cho đơn vị vận chuyển
-        "completed",   // Khách đã nhận hàng
-        "cancelled",   // Hủy bởi khách/admin
-        "expired",     // Hết hạn thanh toán (10 phút)
+        "pending", // Đơn tạm (chưa thanh toán, chưa trừ stock)
+        "preparing", // COD/Bank → đã xác nhận, đang chuẩn bị hàng
+        "paid", // VNPay thanh toán thành công
+        "processing", // Đang xử lý (đã đóng gói, chờ giao)
+        "shipped", // Đã giao cho đơn vị vận chuyển
+        "completed", // Khách đã nhận hàng
+        "cancelled", // Hủy bởi khách/admin
+        "expired", // Hết hạn thanh toán (10 phút)
       ],
       default: "pending",
       index: true,
@@ -93,7 +93,7 @@ const orderSchema = new mongoose.Schema(
     },
     isSeen: {
       type: Boolean,
-      default: false,
+      default: true,
       index: true,
     },
     // Thời gian hết hạn giữ hàng (chỉ áp dụng cho đơn tạm)
@@ -121,14 +121,21 @@ const orderSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Tự động tạo orderCode nếu chưa có (backup)
 orderSchema.pre("save", async function (next) {
   if (!this.orderCode) {
-    const lastOrder = await this.constructor.findOne({}, {}, { sort: { createdAt: -1 } });
-    const nextNumber = lastOrder && lastOrder.orderCode ? parseInt(lastOrder.orderCode.slice(3)) + 1 : 1;
+    const lastOrder = await this.constructor.findOne(
+      {},
+      {},
+      { sort: { createdAt: -1 } },
+    );
+    const nextNumber =
+      lastOrder && lastOrder.orderCode
+        ? parseInt(lastOrder.orderCode.slice(3)) + 1
+        : 1;
     this.orderCode = `ORD${nextNumber.toString().padStart(6, "0")}`;
   }
 
@@ -141,6 +148,10 @@ orderSchema.pre("save", async function (next) {
 });
 
 // Index để tìm đơn tạm hết hạn nhanh
-orderSchema.index({ isTemporary: true, status: "pending", reserveExpiresAt: 1 });
+orderSchema.index({
+  isTemporary: true,
+  status: "pending",
+  reserveExpiresAt: 1,
+});
 
 module.exports = mongoose.model("Order", orderSchema);
