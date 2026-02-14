@@ -100,7 +100,7 @@ const orderSchema = new mongoose.Schema(
     reserveExpiresAt: {
       type: Date,
       default: null,
-      index: { expires: "10m" }, // MongoDB tự xóa field sau 10 phút (tùy chọn)
+      index: true, // MongoDB tự xóa field sau 10 phút (tùy chọn)
     },
 
     // Thời điểm thanh toán thành công (VNPay)

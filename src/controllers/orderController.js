@@ -243,12 +243,10 @@ exports.createOrder = async (req, res) => {
       !Array.isArray(items) ||
       items.length === 0
     ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Thiếu các trường bắt buộc (userId, paymentMethod, shippingAddress, items)",
-        });
+      return res.status(400).json({
+        error:
+          "Thiếu các trường bắt buộc (userId, paymentMethod, shippingAddress, items)",
+      });
     }
 
     if (
@@ -303,20 +301,16 @@ exports.createOrder = async (req, res) => {
 
       const variant = (product.variants || []).find((v) => v.sku === it.sku);
       if (!variant) {
-        return res
-          .status(400)
-          .json({
-            error: `SKU ${it.sku} không tồn tại trong sản phẩm ${product.name}`,
-          });
+        return res.status(400).json({
+          error: `SKU ${it.sku} không tồn tại trong sản phẩm ${product.name}`,
+        });
       }
 
       const qty = Number(it.quantity);
       if (variant.stockQuantity < qty) {
-        return res
-          .status(400)
-          .json({
-            error: `SKU ${it.sku}: Không đủ tồn kho (cần ${qty}, còn ${variant.stockQuantity})`,
-          });
+        return res.status(400).json({
+          error: `SKU ${it.sku}: Không đủ tồn kho (cần ${qty}, còn ${variant.stockQuantity})`,
+        });
       }
 
       const price = Number(it.price || variant.price || 0);
@@ -552,11 +546,9 @@ exports.updateOrder = async (req, res) => {
             .json({ error: `SKU ${item.sku} không tồn tại` });
         }
         if (variant.stockQuantity < item.quantity) {
-          return res
-            .status(400)
-            .json({
-              error: `SKU ${item.sku}: Không đủ tồn kho (cần ${item.quantity}, còn ${variant.stockQuantity})`,
-            });
+          return res.status(400).json({
+            error: `SKU ${item.sku}: Không đủ tồn kho (cần ${item.quantity}, còn ${variant.stockQuantity})`,
+          });
         }
       }
 
@@ -801,9 +793,15 @@ exports.cancelOrder = async (req, res) => {
     if (!order)
       return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
 
-    if (order.status === "pending") await releaseStock(order);
+    if (order.status === "pending") {
+      await releaseStock(order);
+    }
 
-    await order.deleteOne();
+    order.status = "cancelled";
+    order.isTemporary = false;
+    order.reserveExpiresAt = null;
+
+    await order.save();
 
     res.json({ message: "Đã hủy đơn hàng" });
   } catch (err) {

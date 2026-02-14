@@ -1163,30 +1163,43 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
   // === LỌC ===
-  document.getElementById("btn-filter").onclick = () => {
-    currentPage = 1;
-    currentFilters = {
-      name: document.getElementById("filter-name").value.trim(),
-      category: document.getElementById("filter-category").value,
-      brand: document.getElementById("filter-brand").value.trim(),
-      minQuantity: document.getElementById("filter-min-quantity").value
-    };
-    loadProducts(currentFilters);
+document.getElementById("btn-filter").onclick = () => {
+  currentPage = 1;
+
+  currentFilters = {
+    name: document.getElementById("filter-name").value.trim(),
+    category: document.getElementById("filter-category").value,
+    brand: document.getElementById("filter-brand").value.trim(),
+    minQuantity: document.getElementById("filter-min-quantity").value
   };
 
-  document.getElementById("btn-reset-filter").onclick = () => {
-    document.querySelectorAll(".filter-grid input, .filter-grid select").forEach(el => el.value = "");
-    currentFilters = {};
-    currentPage = 1;
-    loadProducts();
-  };
+  loadProducts(currentFilters, 1);
+};
+
+document.getElementById("btn-reset-filter").onclick = () => {
+  document.querySelectorAll(".filter-grid input, .filter-grid select")
+    .forEach(el => el.value = "");
+
+  currentFilters = {};
+  currentPage = 1;
+
+  loadProducts({}, 1);
+};
+
 
   // === LOAD PRODUCTS ===
-  window.loadProducts = async (filters = {}, page = 1) => {
-    currentPage = page;
+  window.loadProducts = async (filters = currentFilters, page = currentPage) => {
 
-    const params = new URLSearchParams({ ...filters, page, limit });
-    const grid = document.getElementById("productGrid");
+    currentPage = page;
+    currentFilters = filters;
+
+    const params = new URLSearchParams({
+      ...filters,
+      page,
+      limit
+    });
+
+    history.pushState({ filters, page }, "", `?${params.toString()}`);
 
     /* =====================
       SHOW SKELETON
@@ -1344,6 +1357,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       grid.innerHTML = '<p style="text-align:center;padding:20px;color:#e74c3c;">Lỗi tải danh sách sản phẩm!</p>';
     }
   };
+  
+  const grid = document.getElementById("productGrid");
+  //  ĐỌC URL KHI VÀO TRANG / F5
+  const urlParams = new URLSearchParams(window.location.search);
+
+  currentPage = Number(urlParams.get("page")) || 1;
+
+  currentFilters = {
+    name: urlParams.get("name") || "",
+    category: urlParams.get("category") || "",
+    brand: urlParams.get("brand") || "",
+    minQuantity: urlParams.get("minQuantity") || ""
+  };
+
+  // Fill lại UI
+  document.getElementById("filter-name").value = currentFilters.name;
+  document.getElementById("filter-category").value = currentFilters.category;
+  document.getElementById("filter-brand").value = currentFilters.brand;
+  document.getElementById("filter-min-quantity").value = currentFilters.minQuantity;
+
+  // Load lần đầu
+  loadProducts(currentFilters, currentPage);
+
+
   document.addEventListener("change", e => {
     if (!e.target.classList.contains("product-checkbox")) return;
 
@@ -2073,6 +2110,37 @@ document.getElementById("btn-delete-selected")?.addEventListener("click", async 
   } finally {
     hideLoading();
   }
+});
+window.onpopstate = () => {
+  const params = new URLSearchParams(window.location.search);
+
+  currentPage = Number(params.get("page")) || 1;
+
+  currentFilters = {
+    name: params.get("name") || "",
+    category: params.get("category") || "",
+    brand: params.get("brand") || "",
+    minQuantity: params.get("minQuantity") || ""
+  };
+
+  loadProducts(currentFilters, currentPage);
+};
+window.addEventListener("popstate", (event) => {
+  const urlParams = new URLSearchParams(window.location.search);
+
+  const page = parseInt(urlParams.get("page")) || 1;
+
+  const filters = {
+    name: urlParams.get("name") || "",
+    category: urlParams.get("category") || "",
+    brand: urlParams.get("brand") || "",
+    minQuantity: urlParams.get("minQuantity") || ""
+  };
+
+  currentFilters = filters;
+  currentPage = page;
+
+  loadProducts(filters, page);
 });
 
 </script>
