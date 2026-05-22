@@ -63,6 +63,7 @@ const allowedOrigins = [
   "https://ososaigon.com",
   "https://ososaigon-user.vercel.app",
   "https://ososaigon-admin.onrender.com",
+  "https://ossosaigon-be.onrender.com",
 ];
 
 app.use(

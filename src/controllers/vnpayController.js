@@ -58,9 +58,9 @@ const finalizeOrder = async (order) => {
     order.items.map((item) =>
       Product.updateOne(
         { "variants.sku": item.sku },
-        { $inc: { "variants.$.stockQuantity": -item.quantity } }
-      )
-    )
+        { $inc: { "variants.$.stockQuantity": -item.quantity } },
+      ),
+    ),
   );
 
   if (order.promotionId) {
@@ -71,7 +71,7 @@ const finalizeOrder = async (order) => {
 
   await Cart.findOneAndUpdate(
     { userId: order.userId },
-    { $set: { items: [] } }
+    { $set: { items: [] } },
   );
 
   const points = Math.floor(order.total / 10000);
@@ -162,7 +162,7 @@ exports.vnpayReturn = async (req, res) => {
         "Amount mismatch! Received:",
         receivedAmount,
         "Expected:",
-        order.total
+        order.total,
       );
       return res.redirect(`${process.env.CLIENT_URL}/payment-failed`);
     }
@@ -171,7 +171,7 @@ exports.vnpayReturn = async (req, res) => {
     // Nhưng nếu muốn an toàn hơn (IPN delay), có thể update ở đây với check duplicate
     return verification.vnp_ResponseCode === "00"
       ? res.redirect(
-          `${process.env.CLIENT_URL}/payment-success?order=${order.orderCode}`
+          `${process.env.CLIENT_URL}/payment-success?order=${order.orderCode}`,
         )
       : res.redirect(`${process.env.CLIENT_URL}/payment-failed`);
   } catch (err) {
