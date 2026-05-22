@@ -46,6 +46,7 @@ exports.submitNewsletter = async (req, res) => {
     res.status(500).json({ message: "Lỗi server" });
   }
 };
+
 /* ===== FILTER ===== */
 exports.filterNewsletter = async (req, res) => {
   try {
@@ -90,7 +91,7 @@ exports.markRead = async (req, res) => {
 exports.exportNewsletter = async (req, res) => {
   const items = await NewsletterContact.find().lean();
 
-  const rows = items.map(i => ({
+  const rows = items.map((i) => ({
     email: i.email,
     name: i.name,
     message: i.message,
